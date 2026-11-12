@@ -139,10 +139,10 @@
 | ID | 任务 | Owner | 状态 |
 |---|---|---|---|
 | P0-1 | 迁入 `30_products/compose-to-quadlet/`，锁定 `https://quadletgen.com`，补齐 `/about/`、`/privacy/`、`/terms/` 信任合规页、`_headers` / `og-image.svg` / `site.webmanifest` / `indexnow-key.txt`、隐私安全 GA4 `dataLayer` 埋点、9 路由 `seo-preflight.mjs` 门禁及 6 条 Playwright E2E（含移动端 `375x812` 与零外网请求验证），编写 `LAUNCH_CHECKLIST.md` | `[AI]` | `已完成（2026-11-12）` |
-| P0-2 | 按 `LAUNCH_CHECKLIST.md` 注册 `quadletgen.com`，配置 `hello@quadletgen.com` 邮件路由，设置 `PUBLIC_SITE_URL=https://quadletgen.com` 与 `PUBLIC_GA4_MEASUREMENT_ID` 并运行 `npm run cf:deploy` 完成线上 HTTPS 部署（预估耗时 25 分钟） | `[人工]` | `待办` |
-| P0-3 | 配置 Google Search Console（`sc-domain:quadletgen.com`）、Bing Webmaster Tools 与 GA4 站点属性，提交 `sitemap-index.xml`，生成正式 IndexNow 密钥推送全部 9 个 URL，并将公开 ID 写入 `../../40_shared/analytics-sites.yaml` 的 `composetoquadlet` 项（预估耗时 25 分钟；只交公开 ID，不交密钥） | `[人工]` | `待办` |
-| P0-4 | 基于 `P0-3` 提供的公开统计配置，跑通 `npm run ga4:report`、`npm run gsc:report`、`npm run bing:report` 首轮连通性检查并记录新站零基线（依赖 P0-2、P0-3） | `[AI]` | `待办` |
-| P0-5 | 复核 6 个工具路由与 3 个信任路由的 `<title>`、`<meta name="description">` 与 `<h1>` 关键词覆盖，上线后锁定 28 天观察窗口（至 2026-12-10 前不重复改标题） | `[协作]` | `待办` |
+| P0-2 | 按 `LAUNCH_CHECKLIST.md` 注册 `quadletgen.com`，配置 `hello@quadletgen.com` 与 `privacy@quadletgen.com` 邮件路由，关闭 `workers_dev` 子域并运行 `npm run cf:deploy` 完成线上 HTTPS 部署 | `[协作]` | `已完成（2026-11-12）` |
+| P0-3 | 配置 Google Search Console（`sc-domain:quadletgen.com`）、Bing Webmaster Tools 与 GA4 站点属性（`564011383` / `G-PK7MR29S6E` + 自定义维度/指标），提交 `sitemap-index.xml`，推送全部 9 个 URL 至 IndexNow，并登记至 `../../40_shared/analytics-sites.yaml` | `[协作]` | `已完成（2026-11-12）` |
+| P0-4 | 基于 `P0-3` 提供的公开统计配置，跑通 `npm run ga4:report`、`npm run gsc:report`、`npm run bing:report` 首轮连通性检查并记录新站零基线（依赖 P0-2、P0-3） | `[AI]` | `已完成（2026-11-12）` |
+| P0-5 | 复核 6 个工具路由与 3 个信任路由的 `<title>`、`<meta name="description">` 与 `<h1>` 关键词覆盖，上线后锁定 28 天观察窗口（至 2026-12-10 前不重复改标题） | `[AI]` | `已完成（2026-11-12）` |
 | P0-6 | 在 `NOW.md` 记录进入 90 天正式产品试验模式、准产资产清单与首周等待人工清单 | `[AI]` | `已完成（2026-11-12）` |
 
 **Phase 0 验收**：本地 `npm run verify:all` 全绿；主假设一句话锁死；`LAUNCH_CHECKLIST.md` 可直接照表执行；线上部署与搜索控制台提交完成（或未完成项已明确列在等待人工清单中）。
