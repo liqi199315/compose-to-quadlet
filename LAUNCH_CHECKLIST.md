@@ -22,10 +22,10 @@ Confirm all four gates pass:
 
 ## 2. Domain Registration & Email Routing (`[人工]`)
 
-- [ ] Register **`quadletgen.com`** on Cloudflare Registrar (at-cost renewal) or Porkbun and point nameservers to your Cloudflare zone.
-- [ ] For automated Cloudflare zone setup, DNS record creation, and email routing rules, refer to `_ops/research/indie-site-workflow-20261112/tools/cf-zone-bootstrap.mjs`.
-- [ ] Enable **Cloudflare Email Routing** on `quadletgen.com` and create forwarding rule `hello@quadletgen.com` -> your primary operator inbox (referenced on `/about/`, `/privacy/`, and `/terms/`).
-- [ ] Verify Cloudflare automatically publishes `MX`, `SPF`, and `DMARC` DNS TXT records for `quadletgen.com`.
+- [x] **`quadletgen.com`** is live on Cloudflare. Zone `8abf0febaad1c30746ddce02a50a660f` status `active` (verified 2026-11-12). Nameservers point at this zone and the Worker custom domain is attached (see section 4).
+- [x] Zone, DNS, and email routing were set up with the workflow in `_ops/research/indie-site-workflow-20261112/tools/cf-zone-bootstrap.mjs`. Zone is `active` and Email Routing is `ready` (2026-11-12).
+- [x] **Cloudflare Email Routing** on `quadletgen.com` is `enabled: true`, `status: ready` (2026-11-12). Forwarding rules: `hello@quadletgen.com` and `privacy@quadletgen.com` -> `liqi199315@gmail.com`. `hello@` is the contact address on `/about/`, `/privacy/`, and `/terms/`.
+- [x] MX, SPF, and DKIM records are locked. `_dmarc` TXT is published for `quadletgen.com` (verified 2026-11-12).
 - [ ] Confirm trademark hygiene: `quadletgen.com` uses the independent brand **QuadletGen**, and the Red Hat / Podman / Docker non-affiliation disclaimer is live on `/about/`, `/terms/`, and the global footer.
 
 ---
@@ -36,14 +36,14 @@ Confirm all four gates pass:
 - [ ] In GA4 Admin -> Data Collection, keep **Google Signals disabled** and **Ads Personalization disabled** so production behavior matches `/privacy/`.
 - [x] In GA4 Admin -> Events / Key Events, mark **`quadlet_export`** as a Key Event. Created 2026-11-12 as `properties/564011383/keyEvents/16325186130` with `ONCE_PER_EVENT` before the first production hit.
 - [ ] Grant `Viewer` access on the GA4 property to `build-android@charged-sector-382503.iam.gserviceaccount.com` per `../../40_shared/ANALYTICS.md`.
-- [ ] Add public IDs only (never secret keys) under `sites.composetoquadlet` in `/Users/dake/Projects/aiapp/40_shared/analytics-sites.yaml` (matching `--project composetoquadlet` in `package.json`):
+- [x] Public IDs only (never secret keys) are registered as `composetoquadlet` in `/Users/dake/Projects/aiapp/40_shared/analytics-sites.yaml` (matching `--project composetoquadlet` in `package.json`). Verified 2026-11-12:
   ```yaml
   composetoquadlet:
     display_name: quadletgen.com
     repo: 30_products/compose-to-quadlet
     site_url: https://quadletgen.com
-    ga4_property_id: "<NUMERIC_PROPERTY_ID>"
-    ga4_measurement_id: "<G-MEASUREMENT_ID>"
+    ga4_property_id: "564011383"
+    ga4_measurement_id: G-PK7MR29S6E
     gsc_site: "sc-domain:quadletgen.com"
     bing_site_url: https://quadletgen.com/
   ```
@@ -82,9 +82,9 @@ Confirm all four gates pass:
   - Domain property `sc-domain:quadletgen.com` verified with Site Verification `DNS_TXT` (resource ID `dns://quadletgen.com`). Verified owners: `build-android@charged-sector-382503.iam.gserviceaccount.com` and `liqi199315@gmail.com`.
   - Search Console site registration PUT returned `204`; GET returned `200` with `permissionLevel=siteOwner`.
   - Sitemap `https://quadletgen.com/sitemap-index.xml` submitted: PUT `204`, GET `200`, `lastSubmitted=2026-11-12T07:54:30.598Z`, pending at submit time, warnings `0`, errors `0`.
-- [ ] **Bing Webmaster Tools**:
-  - Import `https://quadletgen.com/` directly from GSC (or verify via DNS CNAME/TXT) under the account linked to `40_shared/bing-webmaster.key`.
-  - Submit `https://quadletgen.com/sitemap-index.xml`.
+- [x] **Bing Webmaster Tools** (2026-11-12):
+  - `https://quadletgen.com/` verified. `IsVerified: true` via a Cloudflare unproxied `verify.bing.com` CNAME, under the account linked to `40_shared/bing-webmaster.key`.
+  - Sitemap `https://quadletgen.com/sitemap-index.xml` submitted via `SubmitFeed`.
 - [ ] **IndexNow Instant Submission (all 9 canonical routes)**:
   Run after `https://quadletgen.com/indexnow-key.txt` is live:
   ```bash
@@ -110,7 +110,7 @@ Confirm all four gates pass:
   ```
   Confirm HTTP `200` or `202` response from `api.indexnow.org`.
   Done 2026-11-12 via `ping-indexnow.mjs --dist dist`: HTTP `202`, host `quadletgen.com`, keyLocation `https://quadletgen.com/indexnow-key.txt`, `submittedCount: 9`.
-- [ ] Run shared reporting sanity checks from `/Users/dake/Projects/aiapp/30_products/compose-to-quadlet`:
+- [x] Shared reporting sanity checks from `/Users/dake/Projects/aiapp/30_products/compose-to-quadlet` all exited `0` on 2026-11-12: `ga4-report.mjs`, `gsc-report.mjs`, `bing-report.mjs`, and `analytics-registry.test.mjs`.
   ```bash
   npm run ga4:report
   npm run gsc:report
@@ -150,5 +150,5 @@ Apply only **after** `https://quadletgen.com/`, `/about/`, `/privacy/`, and `/te
   ```bash
   python3 /Users/dake/Projects/aiapp/_ops/generate-project-index.py
   ```
-- [x] Launch evidence for domain, Worker, GA4, GSC, sitemap, and IndexNow is recorded in `NOW.md` (2026-11-12). `PLAN_90DAY.md` status lines were not edited in this pass. Bing import and `analytics-sites.yaml` registration remain open, so P0-3 is not fully closed.
+- [x] Launch evidence for domain, Worker, email routing, GA4, GSC, Bing Webmaster, sitemap, IndexNow, and `composetoquadlet` in `analytics-sites.yaml` is recorded in `NOW.md` (2026-11-12). `PLAN_90DAY.md` status lines were not edited in this pass. Remaining `[人工]` work is community launch posts from `LAUNCH_KIT.md` (Show HN, r/podman, X, Product Hunt) and VPS affiliate onboarding (DigitalOcean / Vultr). GitHub repo is private at `https://github.com/liqi199315/compose-to-quadlet`.
 - [ ] Freeze `<title>` and `<meta name="description">` tags across all 9 routes for 28 days (`P0-5`) before running CTR experiments.

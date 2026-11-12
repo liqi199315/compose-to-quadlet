@@ -11,6 +11,10 @@
 - **Search Console（2026-11-12）**：Site Verification `DNS_TXT` 通过，资源 ID `dns://quadletgen.com`。已验证所有者为 `build-android@charged-sector-382503.iam.gserviceaccount.com` 与 `liqi199315@gmail.com`。域名资源 `sc-domain:quadletgen.com` 注册成功（PUT 204，GET 200，`permissionLevel=siteOwner`）。Sitemap `https://quadletgen.com/sitemap-index.xml` 已提交（PUT 204，GET 200，`lastSubmitted=2026-11-12T07:54:30.598Z`，提交时 `isPending=true`，warnings `0`，errors `0`）。
 - **IndexNow（2026-11-12）**：`https://api.indexnow.org/indexnow` 返回 HTTP `202`，host `quadletgen.com`，keyLocation `https://quadletgen.com/indexnow-key.txt`，提交 9 条 URL。
 - **边缘冒烟（2026-11-12）**：`https://quadletgen.com/` 对 Googlebot、AdsBot-Google、Bingbot、OAI-SearchBot、ChatGPT-User、PerplexityBot 均为 HTTP `200`。`https://www.quadletgen.com/` 返回 HTTP `301`，Location `https://quadletgen.com/`。线上 HTML 的 `ga4Id` 为 `G-PK7MR29S6E`，并加载 `googletagmanager.com/gtag/js`。
+- **Cloudflare Zone 与邮件路由（2026-11-12）**：Zone `8abf0febaad1c30746ddce02a50a660f`（`quadletgen.com`）状态 `active`。Email Routing `enabled: true`，`status: ready`。`hello@quadletgen.com` 与 `privacy@quadletgen.com` 均转发到 `liqi199315@gmail.com`。MX、SPF、DKIM 已锁定，并有 `_dmarc` TXT。
+- **共享统计登记（2026-11-12）**：`../../40_shared/analytics-sites.yaml` 的 `composetoquadlet` 已登记。`ga4_property_id: "564011383"`，Measurement ID `G-PK7MR29S6E`，`gsc_site: "sc-domain:quadletgen.com"`，`bing_site_url: https://quadletgen.com/`，`site_url: https://quadletgen.com/`。
+- **Bing Webmaster（2026-11-12）**：`IsVerified: true`（Cloudflare 未代理的 `verify.bing.com` CNAME）。Sitemap `https://quadletgen.com/sitemap-index.xml` 已通过 `SubmitFeed` 提交。
+- **报表脚本（2026-11-12）**：`ga4-report.mjs`、`gsc-report.mjs`、`bing-report.mjs`、`analytics-registry.test.mjs` 均退出码 `0`。GitHub 仓库仍为私有：`https://github.com/liqi199315/compose-to-quadlet`。
 
 ## 已就绪准产资产清单
 
@@ -35,13 +39,12 @@
 
 ## 等待站长完成的清单（`[人工]`）
 
-1. **P0-2**：`quadletgen.com` 已在 Cloudflare 生效并绑定 Worker 自定义域名（2026-11-12）。`hello@quadletgen.com` 邮件转发是否已开通，本轮未核验。
-2. **P0-3**：GA4、GSC 域名验证与 sitemap、IndexNow 已完成（见上方 ID）。Bing Webmaster 尚未导入。公开 ID 尚未写入 `../../40_shared/analytics-sites.yaml` 的 `composetoquadlet` 条目（本轮按授权不改该文件）。
-3. **P2-1（联盟账号准备，预估 20 分钟）**：站点已可访问。凭 `/about/`、`/privacy/`、`/terms/` 申请 DigitalOcean 与 Vultr 推广链接；Hetzner Cloud 自助推荐计划已停，保持无联盟链接。
+1. **社区首发（预估 40 分钟）**：按 `LAUNCH_KIT.md` 手动发布 Show HN、r/podman、X、Product Hunt。GitHub 仓库仍为私有：`https://github.com/liqi199315/compose-to-quadlet`。
+2. **P2-1（联盟账号准备，预估 20 分钟）**：站点已可访问。凭 `/about/`、`/privacy/`、`/terms/` 申请 DigitalOcean 与 Vultr 推广链接；Hetzner Cloud 自助推荐计划已停，保持无联盟链接。
 
 ## 下一步第一动作
 
-- 把 GA4 Property `564011383` 与 Measurement ID `G-PK7MR29S6E` 登记进 `40_shared/analytics-sites.yaml` 的 `composetoquadlet`，再跑 `npm run ga4:report` 与 `npm run gsc:report`。Bing Webmaster 仍待导入并提交同一 sitemap。
+- `[人工]`：从 `LAUNCH_KIT.md` 发社区首发帖（Show HN、r/podman、X、Product Hunt），并开始 DigitalOcean / Vultr 联盟入驻。邮件路由、Bing Webmaster、共享统计登记与四条报表脚本均已在 2026-11-12 核验通过。
 
 ## 行动记录
 
@@ -49,3 +52,4 @@
 - `2026-11-12` `[AI]`：正式迁入 `30_products/compose-to-quadlet/` 并对齐目标域名 `https://quadletgen.com`；新增 `/about/`、`/privacy/`、`/terms/` 三个 E-E-A-T 信任合规页，升级 `scripts/seo-preflight.mjs`（9 路由 + 8 静态产物 + `og:image` + 全量 JSON-LD 门禁）与 `tests/e2e/quadlet.spec.ts`（扩展至 6 条 E2E，覆盖本地 GA4 `dataLayer` 队列零外网泄漏与 `375x812` 移动端响应式体验），并交付 `LAUNCH_CHECKLIST.md`。
 - `2026-11-12` `[AI]`：完成 Slice 3 站点硬化：使用 Playwright 渲染生成 1200x630 `og-image.png` 与 1280x640 `github-social-preview.png`，更新 `BaseLayout.astro` 元标签；更新 `.gitignore` 补充秘密文件防护；在 `public/_headers` 增加 `workers.dev` 与 `pages.dev` 预览域名 `noindex`；创建双重 IndexNow key 文件 `c9d2e4f73a814b629d4c35e8f2a16c53.txt`；使用 esbuild 打包独立 Node ESM CLI `bin/compose-to-quadlet.mjs` 并编写 10 项 Vitest 测试覆盖；升级 `README.md` 与交付 `LAUNCH_KIT.md`；升级 `scripts/seo-preflight.mjs` 断言 PNG 魔数、双重 key 与 headers 防护，并通过 `npm run verify:all` 全量验收。
 - `2026-11-12` `[AI]`：生产上线 `https://quadletgen.com`。GA4 Property `564011383`，Stream `16325768198`，Measurement ID `G-PK7MR29S6E`，Key Event `quadlet_export`。Site Verification DNS_TXT 与 GSC `sc-domain:quadletgen.com` 完成，sitemap PUT 204。IndexNow HTTP 202（9 URL）。构建时 `launch-preflight` 与 `seo:check` 均为 `ok: true`。Wrangler 部署 Version ID `5d9f6d3a-eb30-4899-b80c-e671203e5d13`。六种机器人 UA 对首页均为 HTTP 200，`www` 为 301。
+- `2026-11-12` `[AI]`：核验邮件路由、Bing Webmaster 与共享统计登记。Zone `8abf0febaad1c30746ddce02a50a660f` 为 `active`；Email Routing `enabled: true, status: ready`，`hello@` 与 `privacy@` 转发到 `liqi199315@gmail.com`，MX/SPF/DKIM 锁定且有 `_dmarc` TXT。`composetoquadlet` 已写入 `../../40_shared/analytics-sites.yaml`（`564011383` / `G-PK7MR29S6E` / `sc-domain:quadletgen.com` / `https://quadletgen.com/`）。Bing `IsVerified: true`（未代理 `verify.bing.com` CNAME），sitemap 经 `SubmitFeed` 提交。`ga4-report.mjs`、`gsc-report.mjs`、`bing-report.mjs`、`analytics-registry.test.mjs` 退出码均为 `0`。剩余 `[人工]`：`LAUNCH_KIT.md` 社区首发与 DigitalOcean / Vultr 入驻。
