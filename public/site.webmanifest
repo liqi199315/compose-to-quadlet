@@ -1,0 +1,18 @@
+{
+  "name": "QuadletGen - Docker Compose to Podman Quadlet Converter",
+  "short_name": "QuadletGen",
+  "description": "Browser-local converter turning Docker Compose YAML and container CLI commands into Podman systemd Quadlet unit files.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

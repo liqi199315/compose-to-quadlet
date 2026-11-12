@@ -1,0 +1,33 @@
+# QuadletGen
+
+> Browser-local Docker Compose and Docker Run to Podman Quadlet systemd unit converter.
+
+QuadletGen (`https://quadletgen.com`) converts `compose.yaml` service stacks and `docker run` or `podman run` CLI commands into declarative Podman Quadlet files (`.container`, `.network`, `.volume`, and `.env`) for `systemd` on Linux. Every parse, SELinux bind mount relabel (`:z` and `:Z`), secret extraction, and `.zip` archive export runs locally inside the user's browser with zero server uploads and zero container count limits.
+
+## Capabilities
+
+- Parses multi-service Docker Compose YAML (`services`, `volumes`, `networks`, `ports`, `environment`, `depends_on`, `healthcheck`, `restart`, `devices`, `cap_add`, `cap_drop`, `labels`, `user`, and `command`).
+- Translates single-container `docker run` and `podman run` shell invocations into standalone `.container` units.
+- Targets both rootless (`~/.config/containers/systemd/` with `systemctl --user`) and rootful (`/etc/containers/systemd/` with `sudo systemctl`) install scopes.
+- Applies SELinux volume relabeling (`:z` shared or `:Z` private) for Fedora, RHEL, CentOS Stream, Fedora CoreOS, and Universal Blue hosts.
+- Separates sensitive environment keys into a companion `.env` file wired via `EnvironmentFile=`.
+- Bundles all generated Quadlet unit files into a downloadable `<stack>-quadlet.zip` archive.
+
+## Tools and Routes
+
+- [Docker Compose to Quadlet Converter](https://quadletgen.com/): Convert multi-container `compose.yaml` files into `.container`, `.network`, and `.volume` units.
+- [Podman Quadlet Generator](https://quadletgen.com/podman-quadlet-generator/): Generate declarative systemd container services with `AutoUpdate=registry` and restart rules.
+- [Docker Run to Quadlet Converter](https://quadletgen.com/docker-run-to-quadlet-converter/): Translate `docker run` and `podman run` CLI flags into clean `.container` files.
+- [Rootless Quadlet SELinux Volume Generator](https://quadletgen.com/rootless-quadlet-selinux-volume-generator/): Configure rootless Podman bind mounts with `:z` and `:Z` SELinux labels plus `.env` secret files.
+- [Immich, Nextcloud, and Vaultwarden Quadlet Templates](https://quadletgen.com/immich-nextcloud-vaultwarden-quadlet-templates/): Load ready-to-customize self-hosted Compose stacks and export linked Quadlet units.
+- [Podlet Online Multi-Container Network Packager](https://quadletgen.com/podlet-online-multi-container-network-packager/): Package multi-service Compose stacks with shared `.network` units and `.zip` export in the browser.
+
+## Project and Policies
+
+- [About QuadletGen](https://quadletgen.com/about/): Clean-room client-side conversion methodology, supported Podman 4.4+ systemd directives, and Linux host verification workflow.
+- [Privacy Policy](https://quadletgen.com/privacy/): Browser-local zero-upload guarantee for Compose YAML, container flags, and environment secrets, plus sanitized analytics disclosure.
+- [Terms of Service](https://quadletgen.com/terms/): MIT-style clean-room utility usage terms and Linux production review guidance.
+
+## Notice
+
+Independent Linux systemd utility; not affiliated with Red Hat, Podman, or Docker Inc.

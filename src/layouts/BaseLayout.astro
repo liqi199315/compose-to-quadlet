@@ -1,0 +1,501 @@
+---
+import '../styles/global.css';
+import { ROUTE_PRESETS } from '../lib/route-presets';
+import type { RouteFaqItem } from '../lib/types';
+
+interface Props {
+	title: string;
+	description: string;
+	canonicalPath: string;
+	faqs?: RouteFaqItem[];
+	appName?: string;
+	noindex?: boolean;
+	showComparison?: boolean;
+}
+
+const {
+	title,
+	description,
+	canonicalPath,
+	faqs = [],
+	appName = title,
+	noindex = false,
+	showComparison = true,
+} = Astro.props;
+
+const siteOrigin = (Astro.site ? Astro.site.origin : 'https://quadletgen.com').replace(/\/$/, '');
+const normalizedPath = canonicalPath.startsWith('/') ? canonicalPath : `/${canonicalPath}`;
+const canonicalUrl = new URL(normalizedPath, `${siteOrigin}/`).toString();
+const ogImageUrl = `${siteOrigin}/og-image.png`;
+const ogImageAlt =
+	'QuadletGen: Client-side Docker Compose and Docker Run to Podman systemd Quadlet converter';
+
+const rawGa4Id = (import.meta.env.PUBLIC_GA4_MEASUREMENT_ID ?? '').trim();
+const ga4MeasurementId =
+	/^G-[A-Z0-9]{4,20}$/i.test(rawGa4Id) && rawGa4Id.toUpperCase() !== 'G-XXXXXXXXXX'
+		? rawGa4Id
+		: 'G-PENDING000';
+
+const rawClarityId = (import.meta.env.PUBLIC_CLARITY_PROJECT_ID ?? '').trim();
+const clarityProjectId = /^[a-z0-9]{6,24}$/i.test(rawClarityId) ? rawClarityId : '';
+
+const resolvedFaqs = Array.isArray(faqs)
+	? faqs.filter((item) => Boolean(item?.question?.trim() && item?.answer?.trim()))
+	: [];
+
+const activePreset = ROUTE_PRESETS.find((route) => route.path === normalizedPath);
+const staticPageLabels: Record<string, string> = {
+	'/about/': 'About QuadletGen',
+	'/privacy/': 'Privacy Policy',
+	'/terms/': 'Terms of Service',
+};
+const currentCrumbLabel =
+	activePreset?.navLabel ?? staticPageLabels[normalizedPath] ?? appName;
+
+const breadcrumbItems =
+	normalizedPath === '/'
+		? [
+				{
+					'@type': 'ListItem',
+					position: 1,
+					name: 'QuadletGen',
+					item: `${siteOrigin}/`,
+				},
+		  ]
+		: [
+				{
+					'@type': 'ListItem',
+					position: 1,
+					name: 'QuadletGen',
+					item: `${siteOrigin}/`,
+				},
+				{
+					'@type': 'ListItem',
+					position: 2,
+					name: currentCrumbLabel,
+					item: canonicalUrl,
+				},
+		  ];
+
+const structuredData = {
+	'@context': 'https://schema.org',
+	'@graph': [
+		{
+			'@type': 'Organization',
+			'@id': `${siteOrigin}/#organization`,
+			name: 'QuadletGen',
+			url: `${siteOrigin}/`,
+			logo: {
+				'@type': 'ImageObject',
+				url: `${siteOrigin}/favicon.svg`,
+			},
+			description:
+				'Independent Linux systemd developer utility converting Docker Compose YAML and container CLI flags into Podman Quadlet unit files inside the browser.',
+		},
+		{
+			'@type': 'BreadcrumbList',
+			'@id': `${canonicalUrl}#breadcrumb`,
+			itemListElement: breadcrumbItems,
+		},
+		{
+			'@type': 'WebApplication',
+			'@id': `${canonicalUrl}#webapp`,
+			name: appName,
+			url: canonicalUrl,
+			description,
+			applicationCategory: 'DeveloperApplication',
+			operatingSystem: 'Linux, Any modern browser',
+			isAccessibleForFree: true,
+			image: ogImageUrl,
+			publisher: {
+				'@id': `${siteOrigin}/#organization`,
+			},
+			browserRequirements: 'Requires JavaScript for live browser-local conversion and ZIP export',
+			offers: {
+				'@type': 'Offer',
+				price: '0',
+				priceCurrency: 'USD',
+			},
+		},
+		...(resolvedFaqs.length > 0
+			? [
+					{
+						'@type': 'FAQPage',
+						'@id': `${canonicalUrl}#faq`,
+						mainEntity: resolvedFaqs.map((item) => ({
+							'@type': 'Question',
+							name: item.question,
+							acceptedAnswer: {
+								'@type': 'Answer',
+								text: item.answer,
+							},
+						})),
+					},
+			  ]
+			: []),
+	],
+};
+
+const ga4InlineBootstrap = `(function(){
+if(window.__quadletGenAnalyticsBootstrap)return;
+window.__quadletGenAnalyticsBootstrap=true;
+var ga4Id=${JSON.stringify(ga4MeasurementId || 'G-PENDING000')};
+var clarityId=${JSON.stringify(clarityProjectId)};
+window.dataLayer=window.dataLayer||[];
+function queueGtag(){window.dataLayer.push(arguments);}
+function analyticsPageLocation(){
+try{
+var safe=new URL(location.origin+location.pathname);
+var original=new URL(location.href);
+var campaign=['utm_source','utm_medium','utm_campaign','utm_id','utm_term','utm_content','utm_source_platform','utm_creative_format','utm_marketing_tactic'];
+var clickIds=['gclid','dclid','gbraid','wbraid','msclkid'];
+var allowed=campaign.concat(clickIds);
+for(var i=0;i<allowed.length;i++){
+var key=allowed[i];
+var values=original.searchParams.getAll(key);
+if(values.length!==1)continue;
+var value=values[0];
+var pattern=clickIds.indexOf(key)!==-1?/^[A-Za-z0-9_.~-]{1,256}$/:/^[\\p{L}\\p{M}\\p{N}\\p{P}\\p{S}\\p{Zs}]{1,200}$/u;
+var suspicious=/@|:\\/\\/|\\\\|%[0-9a-f]{2}|(?:token|password|secret|yaml|compose)\\s*=/i.test(value);
+if(pattern.test(value)&&!suspicious){safe.searchParams.set(key,value);}
+}
+return safe.href;
+}catch(_e){
+return location.origin+location.pathname;
+}
+}
+function analyticsPageReferrer(){
+try{
+if(!document.referrer)return '';
+var ref=new URL(document.referrer);
+return (ref.protocol==='https:'||ref.protocol==='http:')?ref.origin+'/':'';
+}catch(_e){
+return '';
+}
+}
+function gtag(){
+if(arguments[0]==='event'){
+var rawParams=arguments[2]||{};
+var merged=Object.assign({},rawParams,{page_location:analyticsPageLocation(),page_referrer:analyticsPageReferrer()});
+return queueGtag('event',arguments[1],merged);
+}
+return queueGtag.apply(null,arguments);
+}
+window.gtag=gtag;
+gtag('js',new Date());
+var safePage={page_location:analyticsPageLocation(),page_referrer:analyticsPageReferrer()};
+gtag('set',safePage);
+gtag('config',ga4Id||'G-PENDING000',Object.assign({},safePage,{anonymize_ip:true}));
+var lastIdentity=location.pathname+location.search;
+var previousVirtualPage=location.origin+location.pathname;
+function trackNavigation(){
+var identity=location.pathname+location.search;
+if(identity===lastIdentity)return;
+var referrer=previousVirtualPage;
+lastIdentity=identity;
+previousVirtualPage=location.origin+location.pathname;
+queueGtag('event','page_view',{page_location:analyticsPageLocation(),page_referrer:referrer});
+}
+if(!window.__quadletGenNavInit){
+window.__quadletGenNavInit=true;
+['pushState','replaceState'].forEach(function(method){
+var original=history[method];
+if(typeof original==='function'){
+history[method]=function(){
+var result=original.apply(this,arguments);
+trackNavigation();
+return result;
+};
+}
+});
+window.addEventListener('popstate',trackNavigation);
+}
+var host=location.hostname;
+var isLocalHost=host==='localhost'||host==='127.0.0.1'||host==='[::1]'||host.endsWith('.localhost');
+if(ga4Id&&ga4Id!=='G-PENDING000'&&ga4Id!=='G-XXXXXXXXXX'&&/^G-[A-Z0-9]+$/i.test(ga4Id)&&!isLocalHost){
+var tag=document.createElement('script');
+tag.async=true;
+tag.src='https://www.googletagmanager.com/gtag/js?id='+encodeURIComponent(ga4Id);
+document.head.appendChild(tag);
+}
+if(clarityId&&!isLocalHost){
+(function(c,l,a,r,i,t,y){
+c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments);};
+t=l.createElement(r);t.async=1;t.src='https://www.clarity.ms/tag/'+encodeURIComponent(i);
+y=l.getElementsByTagName(r)[0];if(y&&y.parentNode){y.parentNode.insertBefore(t,y);}else{document.head.appendChild(t);}
+})(window,document,'clarity','script',clarityId);
+}
+})();`;
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>{title}</title>
+		<meta name="description" content={description} />
+		<meta name="robots" content={noindex ? 'noindex, nofollow' : 'index, follow'} />
+		<meta name="theme-color" content="#020617" />
+		<link rel="canonical" href={canonicalUrl} />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="manifest" href="/site.webmanifest" />
+
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="QuadletGen" />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta property="og:url" content={canonicalUrl} />
+		<meta property="og:locale" content="en_US" />
+		<meta property="og:image" content={ogImageUrl} />
+		<meta property="og:image:type" content="image/png" />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:image:alt" content={ogImageAlt} />
+
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content={title} />
+		<meta name="twitter:description" content={description} />
+		<meta name="twitter:image" content={ogImageUrl} />
+		<meta name="twitter:image:alt" content={ogImageAlt} />
+
+		{
+			!noindex && (
+				<script
+					is:inline
+					type="application/ld+json"
+					set:html={JSON.stringify(structuredData)}
+				/>
+			)
+		}
+		<script is:inline set:html={ga4InlineBootstrap} />
+	</head>
+	<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+		<a
+			href="#main-content"
+			class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-md focus:bg-cyan-400 focus:px-3 focus:py-2 focus:text-xs focus:font-semibold focus:text-slate-950"
+		>
+			Skip to main content
+		</a>
+
+		<header class="sticky top-0 z-40 border-b border-slate-800/90 bg-slate-950/95 backdrop-blur">
+			<div class="mx-auto max-w-7xl px-4 py-3.5 sm:px-6 lg:px-8">
+				<div class="flex flex-col gap-3">
+					<div class="flex flex-wrap items-center justify-between gap-2.5">
+						<div class="flex flex-wrap items-center gap-2.5 sm:gap-3">
+							<a
+								href="/"
+								class="inline-flex items-center gap-2.5 text-base font-bold tracking-tight text-white transition-colors hover:text-cyan-300"
+							>
+								<span class="inline-flex h-7 w-7 items-center justify-center rounded-md border border-cyan-500/40 bg-cyan-500/10 font-mono text-xs font-bold text-cyan-300">
+									[Q]
+								</span>
+								<span>QuadletGen</span>
+							</a>
+							<span class="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[11px] font-medium text-emerald-300 sm:text-xs">
+								<span class="h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+								<span>100% Client-Side YAML Parser</span>
+							</span>
+						</div>
+
+						<details class="group relative w-full sm:w-auto lg:hidden">
+							<summary class="flex min-h-10 w-full cursor-pointer list-none items-center justify-between gap-2.5 rounded-lg border border-slate-800 bg-slate-900/90 px-3 py-2 text-xs font-medium text-slate-200 transition-colors hover:border-cyan-500/40 hover:text-white sm:w-auto [&::-webkit-details-marker]:hidden">
+								<span class="inline-flex items-center gap-2">
+									<span class="font-mono text-[11px] uppercase tracking-wider text-cyan-400">Presets</span>
+									<span class="truncate text-slate-300">{activePreset?.navLabel ?? 'Navigation'}</span>
+								</span>
+								<svg
+									class="h-4 w-4 shrink-0 text-cyan-400 transition-transform group-open:rotate-180"
+									viewBox="0 0 20 20"
+									fill="currentColor"
+									aria-hidden="true"
+								>
+									<path
+										fill-rule="evenodd"
+										d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+										clip-rule="evenodd"
+									/>
+								</svg>
+							</summary>
+
+							<nav
+								aria-label="Mobile Quadlet converter presets"
+								class="mt-2 grid gap-1 rounded-xl border border-slate-800 bg-slate-900 p-2 shadow-2xl sm:absolute sm:right-0 sm:top-full sm:z-50 sm:w-80"
+							>
+								{
+									ROUTE_PRESETS.map((route) => {
+										const isActive = route.path === normalizedPath;
+										return (
+											<a
+												href={route.path}
+												aria-current={isActive ? 'page' : undefined}
+												class={`flex min-h-10 items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+													isActive
+														? 'border border-cyan-500/40 bg-cyan-500/15 text-cyan-200'
+														: 'border border-transparent text-slate-200 hover:bg-slate-800/80 hover:text-white'
+												}`}
+											>
+												<span>{route.navLabel}</span>
+												<span class="font-mono text-[10px] text-slate-400">systemd</span>
+											</a>
+										);
+									})
+								}
+								<div class="my-1 border-t border-slate-800" />
+								<a
+									href="/about/"
+									aria-current={normalizedPath === '/about/' ? 'page' : undefined}
+									class="flex min-h-10 items-center justify-between rounded-lg px-3 py-2 text-xs font-medium text-slate-300 transition-colors hover:bg-slate-800/80 hover:text-white"
+								>
+									<span>About & Methodology</span>
+									<span class="font-mono text-[10px] text-slate-400">docs</span>
+								</a>
+							</nav>
+						</details>
+					</div>
+
+					<nav
+						aria-label="Quadlet converter presets"
+						class="hidden lg:flex lg:flex-wrap lg:items-center lg:justify-between lg:gap-2"
+					>
+						<div class="flex flex-wrap items-center gap-1.5">
+							{
+								ROUTE_PRESETS.map((route) => {
+									const isActive = route.path === normalizedPath;
+									return (
+										<a
+											href={route.path}
+											aria-current={isActive ? 'page' : undefined}
+											class={`rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+												isActive
+													? 'border border-cyan-500/40 bg-cyan-500/15 text-cyan-200'
+													: 'border border-transparent text-slate-300 hover:bg-slate-900 hover:text-white'
+											}`}
+										>
+											{route.navLabel}
+										</a>
+									);
+								})
+							}
+						</div>
+						<a
+							href="/about/"
+							aria-current={normalizedPath === '/about/' ? 'page' : undefined}
+							class={`rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+								normalizedPath === '/about/'
+									? 'border border-cyan-500/40 bg-cyan-500/15 text-cyan-200'
+									: 'border border-slate-800 bg-slate-900/60 text-slate-300 hover:border-cyan-500/40 hover:text-white'
+							}`}
+						>
+							About
+						</a>
+					</nav>
+				</div>
+			</div>
+		</header>
+
+		<main id="main-content" class="flex-1">
+			<slot />
+
+			{
+				showComparison && (
+					<section
+						aria-labelledby="quadlet-tooling-comparison"
+						class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8"
+					>
+						<div class="rounded-xl border border-slate-800 bg-slate-900/60 p-6 sm:p-8">
+							<h2 id="quadlet-tooling-comparison" class="text-xl font-semibold text-white sm:text-2xl">
+								How QuadletGen compares with containers/podlet CLI and Podman Desktop
+							</h2>
+							<p class="mt-2 max-w-3xl text-sm text-slate-300">
+								Choose the right workflow for converting Compose stacks and container commands into Podman systemd units.
+							</p>
+
+							<div class="mt-6 overflow-x-auto">
+								<table class="w-full min-w-[640px] border-collapse text-left text-sm">
+									<thead>
+										<tr class="border-b border-slate-800 text-xs uppercase tracking-wider text-slate-400">
+											<th scope="col" class="py-3 pr-4 font-semibold">Capability</th>
+											<th scope="col" class="py-3 px-4 font-semibold text-cyan-300">QuadletGen (Web)</th>
+											<th scope="col" class="py-3 px-4 font-semibold">containers/podlet CLI</th>
+											<th scope="col" class="py-3 pl-4 font-semibold">Podman Desktop</th>
+										</tr>
+									</thead>
+									<tbody class="divide-y divide-slate-800/80 text-slate-200">
+										<tr>
+											<th scope="row" class="py-3.5 pr-4 font-medium text-white">Host setup required</th>
+											<td class="py-3.5 px-4">Zero installation in any browser</td>
+											<td class="py-3.5 px-4">Rust Cargo build, distro package, or container image</td>
+											<td class="py-3.5 px-4">Desktop GUI plus local Podman machine and extension</td>
+										</tr>
+										<tr>
+											<th scope="row" class="py-3.5 pr-4 font-medium text-white">Multi-file stack preview</th>
+											<td class="py-3.5 px-4">Live unit tabs, combined view, and one-click .zip bundle</td>
+											<td class="py-3.5 px-4">Writes separate files to disk or stdout per CLI run</td>
+											<td class="py-3.5 px-4">Inspects running local pods or containers one by one</td>
+										</tr>
+										<tr>
+											<th scope="row" class="py-3.5 pr-4 font-medium text-white">Shared .network synthesis</th>
+											<td class="py-3.5 px-4">Automatic &lt;stack&gt;.network generation on toggle</td>
+											<td class="py-3.5 px-4">Converts declared Compose networks via CLI flags</td>
+											<td class="py-3.5 px-4">Depends on existing local Podman network state</td>
+										</tr>
+										<tr>
+											<th scope="row" class="py-3.5 pr-4 font-medium text-white">SELinux :z and :Z volume toggle</th>
+											<td class="py-3.5 px-4">Instant switch across none, shared :z, and private :Z</td>
+											<td class="py-3.5 px-4">Manual volume string editing in input YAML or flags</td>
+											<td class="py-3.5 px-4">Manual edit after generating the unit file</td>
+										</tr>
+										<tr>
+											<th scope="row" class="py-3.5 pr-4 font-medium text-white">Secret .env extraction</th>
+											<td class="py-3.5 px-4">Extracts sensitive keys into &lt;stack&gt;.env with EnvironmentFile=</td>
+											<td class="py-3.5 px-4">Preserves inline environment entries unless pre-split</td>
+											<td class="py-3.5 px-4">Inline Environment= lines by default</td>
+										</tr>
+										<tr>
+											<th scope="row" class="py-3.5 pr-4 font-medium text-white">Data privacy</th>
+											<td class="py-3.5 px-4">100% client-side JavaScript with zero server uploads</td>
+											<td class="py-3.5 px-4">Local binary execution</td>
+											<td class="py-3.5 px-4">Local desktop execution</td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
+						</div>
+					</section>
+				)
+			}
+		</main>
+
+		<footer class="border-t border-slate-800 bg-slate-950">
+			<div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+				<div class="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+					<div class="max-w-2xl space-y-2">
+						<div class="flex items-center gap-2">
+							<span class="inline-flex h-6 w-6 items-center justify-center rounded border border-cyan-500/40 bg-cyan-500/10 font-mono text-[11px] font-bold text-cyan-300">
+								[Q]
+							</span>
+							<p class="text-sm font-semibold text-white">QuadletGen</p>
+						</div>
+						<p class="text-xs leading-relaxed text-slate-400">
+							Clean-room browser-local converter for Podman 4.4+ systemd Quadlet units. Container definitions, CLI flags, and environment values never leave your browser.
+						</p>
+						<p class="text-xs leading-relaxed text-slate-500">
+							Independent Linux systemd utility; not affiliated with Red Hat, Podman, or Docker Inc.
+						</p>
+					</div>
+
+					<nav aria-label="Footer navigation" class="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-400">
+						<a href="/" class="py-1 transition-colors hover:text-cyan-300">Home</a>
+						<a href="/about/" class="py-1 transition-colors hover:text-cyan-300">About</a>
+						<a href="/privacy/" class="py-1 transition-colors hover:text-cyan-300">Privacy</a>
+						<a href="/terms/" class="py-1 transition-colors hover:text-cyan-300">Terms</a>
+						<a href="/llms.txt" class="py-1 font-mono transition-colors hover:text-cyan-300">llms.txt</a>
+						<a href="/sitemap-index.xml" class="py-1 font-mono transition-colors hover:text-cyan-300">Sitemap</a>
+						<a href="/robots.txt" class="py-1 font-mono transition-colors hover:text-cyan-300">robots.txt</a>
+					</nav>
+				</div>
+			</div>
+		</footer>
+	</body>
+</html>

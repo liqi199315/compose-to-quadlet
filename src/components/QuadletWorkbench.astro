@@ -1,0 +1,1062 @@
+---
+import { convertToQuadlet } from '../lib/quadlet-engine';
+import { SAMPLE_TEMPLATES } from '../lib/sample-templates';
+import type {
+	GeneratedUnitFile,
+	InstallScope,
+	QuadletConversionResult,
+	QuadletRoutePreset,
+	SampleTemplateId,
+} from '../lib/types';
+
+interface Props {
+	preset: QuadletRoutePreset;
+}
+
+interface QuickLoadPill {
+	id: SampleTemplateId;
+	pillLabel: string;
+}
+
+interface SummaryBadge {
+	key: string;
+	label: string;
+	tone: 'cyan' | 'emerald' | 'indigo' | 'amber' | 'slate';
+}
+
+const { preset } = Astro.props;
+
+const TEMPLATE_IDS: SampleTemplateId[] = [
+	'web-postgres-redis',
+	'immich-stack',
+	'vaultwarden-caddy',
+	'nextcloud-mariadb',
+	'docker-run-jellyfin',
+];
+
+const QUICK_LOAD_PILLS: readonly QuickLoadPill[] = [
+	{ id: 'web-postgres-redis', pillLabel: 'Web + Postgres + Redis' },
+	{ id: 'immich-stack', pillLabel: 'Immich Stack' },
+	{ id: 'vaultwarden-caddy', pillLabel: 'Vaultwarden + Caddy' },
+	{ id: 'nextcloud-mariadb', pillLabel: 'Nextcloud + MariaDB' },
+	{ id: 'docker-run-jellyfin', pillLabel: 'docker run CLI' },
+];
+
+const TONE_CLASSES: Record<SummaryBadge['tone'], string> = {
+	cyan: 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200',
+	emerald: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200',
+	indigo: 'border-sky-500/35 bg-sky-500/10 text-sky-200',
+	amber: 'border-amber-500/40 bg-amber-500/10 text-amber-200',
+	slate: 'border-slate-700/90 bg-slate-950/90 text-slate-300',
+};
+
+const initialTemplate = SAMPLE_TEMPLATES[preset.defaultTemplateId];
+const initialRawInput = initialTemplate.content;
+const initialResult = convertToQuadlet(initialRawInput, preset.defaultOptions);
+
+function getTargetDir(scope: InstallScope): string {
+	return scope === 'rootless' ? '~/.config/containers/systemd/' : '/etc/containers/systemd/';
+}
+
+function formatCombinedOutput(files: GeneratedUnitFile[]): string {
+	return files
+		.map((file) => `# === ${file.filename} (${file.installPath}) ===\n${file.content.trimEnd()}`)
+		.join('\n\n');
+}
+
+function buildSummaryBadges(result: QuadletConversionResult, scope: InstallScope): SummaryBadge[] {
+	const targetDir = getTargetDir(scope);
+	if (!result.ok) {
+		return [
+			{ key: 'containers', label: '0 .container units', tone: 'slate' },
+			{ key: 'network', label: '.network DNS: paused on syntax error', tone: 'amber' },
+			{ key: 'volumes', label: '0 .volume units', tone: 'slate' },
+			{ key: 'install-path', label: `Install path: ${targetDir}`, tone: 'slate' },
+		];
+	}
+
+	const containerCount = result.files.filter((f) => f.unitType === 'container').length;
+	const networkFiles = result.files.filter((f) => f.unitType === 'network');
+	const volumeCount = result.files.filter((f) => f.unitType === 'volume').length;
+	const envFiles = result.files.filter((f) => f.unitType === 'env');
+
+	const badges: SummaryBadge[] = [
+		{
+			key: 'containers',
+			label: `${containerCount} .container ${containerCount === 1 ? 'unit' : 'units'}`,
+			tone: 'cyan',
+		},
+		networkFiles.length > 0
+			? {
+					key: 'network',
+					label: `.network DNS: ${networkFiles[0]!.filename} (aardvark-dns)`,
+					tone: 'emerald',
+			  }
+			: {
+					key: 'network',
+					label: '.network DNS: host / default bridge',
+					tone: 'slate',
+			  },
+		{
+			key: 'volumes',
+			label: `${volumeCount} .volume ${volumeCount === 1 ? 'unit' : 'units'}`,
+			tone: volumeCount > 0 ? 'indigo' : 'slate',
+		},
+	];
+
+	if (envFiles.length > 0) {
+		badges.push({
+			key: 'env',
+			label: `.env secrets: ${envFiles[0]!.filename} (chmod 600)`,
+			tone: 'amber',
+		});
+	}
+
+	badges.push({
+		key: 'install-path',
+		label: `Install path: ${targetDir}`,
+		tone: 'slate',
+	});
+
+	return badges;
+}
+
+const initialTargetDir = getTargetDir(preset.defaultOptions.installScope);
+const initialStatusText = initialResult.ok
+	? `Detected mode: ${initialResult.inputMode} | Generated units: ${initialResult.files.length} (${initialResult.serviceCount} ${initialResult.serviceCount === 1 ? 'service' : 'services'}) | Target directory: ${initialTargetDir}`
+	: `Conversion error: ${initialResult.error}`;
+
+const initialSummaryBadges = buildSummaryBadges(initialResult, preset.defaultOptions.installScope);
+const initialOutputText = initialResult.ok ? formatCombinedOutput(initialResult.files) : '';
+const initialCommandsText = initialResult.ok ? initialResult.systemdCommands.join('\n') : '';
+const initialWarnings = initialResult.ok ? initialResult.warnings : [];
+const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.defaultInputMode;
+---
+
+<section aria-label="Quadlet converter workbench" class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+	<div
+		data-workbench-root
+		class="min-w-0 rounded-2xl border border-slate-800/90 bg-slate-900/85 p-4 shadow-2xl shadow-slate-950/60 sm:p-6"
+	>
+		<div class="border-b border-slate-800/90 pb-4">
+			<div class="flex flex-wrap items-center justify-between gap-2">
+				<span class="font-mono text-[11px] font-semibold uppercase tracking-wider text-cyan-400">
+					1-Click Stack Quick-Load
+				</span>
+				<span class="font-mono text-[11px] text-slate-400">
+					Zero server uploads. Runs locally in browser memory.
+				</span>
+			</div>
+			<div
+				role="group"
+				aria-label="1-Click Stack Quick-Load Pills"
+				class="mt-2.5 flex flex-wrap items-center gap-2"
+			>
+				{
+					QUICK_LOAD_PILLS.map((pill) => {
+						const isActive = pill.id === preset.defaultTemplateId;
+						return (
+							<button
+								type="button"
+								data-template-pill={pill.id}
+								aria-pressed={isActive ? 'true' : 'false'}
+								class={`inline-flex min-h-10 max-w-full items-center gap-1.5 rounded-lg border px-3 py-2 font-mono text-xs font-medium transition-colors ${
+									isActive
+										? 'border-cyan-400/70 bg-cyan-500/20 text-cyan-100 shadow-sm shadow-cyan-950/50'
+										: 'border-slate-800 bg-slate-950/90 text-slate-300 hover:border-cyan-500/40 hover:bg-slate-900 hover:text-white'
+								}`}
+							>
+								<span
+									class={`h-1.5 w-1.5 shrink-0 rounded-full ${
+										isActive ? 'bg-cyan-300' : 'bg-slate-600'
+									}`}
+									data-pill-dot
+									aria-hidden="true"
+								/>
+								<span class="truncate">{pill.pillLabel}</span>
+							</button>
+						);
+					})
+				}
+			</div>
+		</div>
+
+		<div class="mt-4 grid grid-cols-1 gap-4 border-b border-slate-800/90 pb-5 sm:grid-cols-2 lg:grid-cols-12">
+			<div class="flex min-w-0 flex-col gap-1.5 sm:col-span-2 lg:col-span-5">
+				<label for="wb-template-select" class="text-xs font-semibold uppercase tracking-wider text-slate-300">
+					Sample Stack Template
+				</label>
+				<div class="flex flex-col gap-2 sm:flex-row">
+					<select
+						id="wb-template-select"
+						data-testid="template-select"
+						class="min-h-11 min-w-0 w-full flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 transition-colors hover:border-slate-600"
+					>
+						{
+							TEMPLATE_IDS.map((id) => (
+								<option
+									value={id}
+									selected={id === preset.defaultTemplateId}
+									class="bg-slate-900 text-slate-100"
+								>
+									{SAMPLE_TEMPLATES[id].label}
+								</option>
+							))
+						}
+					</select>
+					<button
+						type="button"
+						data-testid="load-template-btn"
+						class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-cyan-500/50 bg-cyan-500/15 px-4 py-2 text-xs font-semibold text-cyan-200 transition-colors hover:bg-cyan-500/25 hover:text-white"
+					>
+						Load Template
+					</button>
+				</div>
+			</div>
+
+			<div class="flex min-w-0 flex-col gap-1.5 lg:col-span-3">
+				<label for="wb-stack-name" class="text-xs font-semibold uppercase tracking-wider text-slate-300">
+					Stack Name Prefix
+				</label>
+				<input
+					id="wb-stack-name"
+					data-testid="stack-name-input"
+					type="text"
+					value={preset.defaultOptions.stackName}
+					placeholder="webapp"
+					spellcheck="false"
+					class="min-h-11 min-w-0 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-500 transition-colors hover:border-slate-600"
+				/>
+			</div>
+
+			<div class="grid min-w-0 grid-cols-1 gap-3 min-[420px]:grid-cols-2 sm:col-span-2 lg:col-span-4">
+				<div class="flex min-w-0 flex-col gap-1.5">
+					<label for="wb-scope-select" class="text-xs font-semibold uppercase tracking-wider text-slate-300">
+						Install Scope
+					</label>
+					<select
+						id="wb-scope-select"
+						data-testid="scope-select"
+						class="min-h-11 min-w-0 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-sm text-slate-100 transition-colors hover:border-slate-600"
+					>
+						<option
+							value="rootless"
+							selected={preset.defaultOptions.installScope === 'rootless'}
+							class="bg-slate-900 text-slate-100"
+						>
+							rootless (--user)
+						</option>
+						<option
+							value="rootful"
+							selected={preset.defaultOptions.installScope === 'rootful'}
+							class="bg-slate-900 text-slate-100"
+						>
+							rootful (/etc)
+						</option>
+					</select>
+				</div>
+
+				<div class="flex min-w-0 flex-col gap-1.5">
+					<label for="wb-selinux-select" class="text-xs font-semibold uppercase tracking-wider text-slate-300">
+						SELinux Mounts
+					</label>
+					<select
+						id="wb-selinux-select"
+						data-testid="selinux-select"
+						class="min-h-11 min-w-0 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-sm text-slate-100 transition-colors hover:border-slate-600"
+					>
+						<option
+							value="none"
+							selected={preset.defaultOptions.selinuxMode === 'none'}
+							class="bg-slate-900 text-slate-100"
+						>
+							none
+						</option>
+						<option
+							value="shared-z"
+							selected={preset.defaultOptions.selinuxMode === 'shared-z'}
+							class="bg-slate-900 text-slate-100"
+						>
+							shared (:z)
+						</option>
+						<option
+							value="private-Z"
+							selected={preset.defaultOptions.selinuxMode === 'private-Z'}
+							class="bg-slate-900 text-slate-100"
+						>
+							private (:Z)
+						</option>
+					</select>
+				</div>
+			</div>
+		</div>
+
+		<div class="flex flex-col gap-3 border-b border-slate-800/90 py-4 xl:flex-row xl:items-center xl:justify-between">
+			<div class="flex flex-wrap items-center gap-2.5">
+				<label class="inline-flex min-h-10 max-w-full cursor-pointer items-center gap-2.5 rounded-lg border border-slate-800 bg-slate-950/90 px-3 py-2 text-xs font-medium text-slate-200 transition-colors hover:border-cyan-500/40 hover:text-white has-[:checked]:border-cyan-500/50 has-[:checked]:bg-cyan-500/10 has-[:checked]:text-cyan-100">
+					<input
+						type="checkbox"
+						data-testid="auto-update-checkbox"
+						checked={preset.defaultOptions.enableAutoUpdate}
+						class="h-4 w-4 shrink-0 rounded border-slate-600 bg-slate-950 text-cyan-400"
+					/>
+					<span>AutoUpdate=registry</span>
+				</label>
+
+				<label class="inline-flex min-h-10 max-w-full cursor-pointer items-center gap-2.5 rounded-lg border border-slate-800 bg-slate-950/90 px-3 py-2 text-xs font-medium text-slate-200 transition-colors hover:border-cyan-500/40 hover:text-white has-[:checked]:border-cyan-500/50 has-[:checked]:bg-cyan-500/10 has-[:checked]:text-cyan-100">
+					<input
+						type="checkbox"
+						data-testid="shared-network-checkbox"
+						checked={preset.defaultOptions.generateSharedNetwork}
+						class="h-4 w-4 shrink-0 rounded border-slate-600 bg-slate-950 text-cyan-400"
+					/>
+					<span>Generate shared .network</span>
+				</label>
+
+				<label class="inline-flex min-h-10 max-w-full cursor-pointer items-center gap-2.5 rounded-lg border border-slate-800 bg-slate-950/90 px-3 py-2 text-xs font-medium text-slate-200 transition-colors hover:border-cyan-500/40 hover:text-white has-[:checked]:border-cyan-500/50 has-[:checked]:bg-cyan-500/10 has-[:checked]:text-cyan-100">
+					<input
+						type="checkbox"
+						data-testid="extract-secrets-checkbox"
+						checked={preset.defaultOptions.extractSecretsToEnvFile}
+						class="h-4 w-4 shrink-0 rounded border-slate-600 bg-slate-950 text-cyan-400"
+					/>
+					<span>Extract secrets to .env</span>
+				</label>
+			</div>
+
+			<div
+				data-upload-dropzone
+				data-drag-active="false"
+				class="flex min-w-0 items-center rounded-xl border border-dashed border-slate-700 bg-slate-950/80 transition-all hover:border-cyan-500/60"
+			>
+				<label
+					for="wb-file-upload"
+					class="flex min-h-11 w-full cursor-pointer flex-wrap items-center justify-between gap-2 px-3.5 py-2 text-xs font-medium text-slate-200 hover:text-white"
+				>
+					<span class="inline-flex min-w-0 items-center gap-2">
+						<svg
+							class="h-4 w-4 shrink-0 text-cyan-400"
+							viewBox="0 0 20 20"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.75"
+							aria-hidden="true"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								d="M10 13V4m0 0L6.75 7.25M10 4l3.25 3.25M4 13.75v1.5A1.75 1.75 0 005.75 17h8.5A1.75 1.75 0 0016 15.25v-1.5"
+							/>
+						</svg>
+						<span data-dropzone-label class="truncate">
+							Drop compose.yaml / .txt here or browse
+						</span>
+					</span>
+					<span class="rounded border border-slate-800 bg-slate-900 px-2 py-0.5 font-mono text-[11px] text-cyan-300">
+						.yml .yaml .txt
+					</span>
+				</label>
+				<input
+					id="wb-file-upload"
+					data-testid="file-upload"
+					type="file"
+					accept=".yml,.yaml,.txt"
+					class="sr-only"
+				/>
+			</div>
+		</div>
+
+		<div
+			data-testid="status-banner"
+			data-status={initialResult.ok ? 'ok' : 'error'}
+			role="status"
+			aria-live="polite"
+			class={`mt-4 break-words rounded-lg border px-4 py-2.5 font-mono text-xs ${
+				initialResult.ok
+					? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+					: 'border-rose-500/40 bg-rose-500/15 text-rose-200'
+			}`}
+		>
+			{initialStatusText}
+		</div>
+
+		<div
+			data-testid="unit-summary-pills"
+			aria-label="Generated unit architecture summary"
+			class="mt-3 flex flex-wrap items-center gap-2"
+		>
+			{
+				initialSummaryBadges.map((badge) => (
+					<span
+						data-summary-pill={badge.key}
+						class={`inline-flex max-w-full items-center rounded-md border px-2.5 py-1 font-mono text-xs break-all sm:break-normal ${TONE_CLASSES[badge.tone]}`}
+					>
+						{badge.label}
+					</span>
+				))
+			}
+		</div>
+
+		<ul
+			data-warnings-list
+			class={`mt-3 space-y-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-200 ${
+				initialWarnings.length === 0 ? 'hidden' : ''
+			}`}
+		>
+			{
+				initialWarnings.map((warning) => (
+					<li class="break-words">
+						{warning.service ? `[${warning.service}] ` : ''}
+						{warning.field}: {warning.message}
+					</li>
+				))
+			}
+		</ul>
+
+		<div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-12">
+			<div
+				data-input-drop-target
+				data-drag-active="false"
+				class="flex min-w-0 flex-col lg:col-span-5"
+			>
+				<div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+					<label for="wb-compose-input" class="text-xs font-semibold uppercase tracking-wider text-slate-300">
+						Compose YAML or Docker / Podman Run Input
+					</label>
+					<span
+						data-detected-mode-badge
+						class="rounded border border-slate-800 bg-slate-950 px-2 py-0.5 font-mono text-[11px] text-cyan-300"
+					>
+						Mode: {initialDetectedMode}
+					</span>
+				</div>
+				<textarea
+					id="wb-compose-input"
+					data-testid="compose-input"
+					rows="22"
+					spellcheck="false"
+					placeholder="Paste compose.yaml or docker run command, or drag a .yml file onto this pane..."
+					class="min-h-[360px] w-full flex-1 rounded-lg border border-slate-800 bg-slate-950 p-3.5 font-mono text-xs leading-relaxed text-slate-100 transition-colors sm:min-h-[420px]"
+				>{initialRawInput}</textarea>
+			</div>
+
+			<div class="flex min-w-0 flex-col lg:col-span-7">
+				<div class="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+					<label for="wb-unit-output" class="text-xs font-semibold uppercase tracking-wider text-slate-300">
+						Generated Quadlet systemd Units
+					</label>
+
+					<div class="grid grid-cols-1 gap-2 min-[420px]:flex min-[420px]:flex-wrap min-[420px]:items-center">
+						<button
+							type="button"
+							data-testid="copy-unit-btn"
+							class="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 px-3.5 py-2 text-xs font-semibold text-slate-100 transition-colors hover:border-cyan-400/60 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							Copy Active Output
+						</button>
+						<button
+							type="button"
+							data-testid="download-zip-btn"
+							class="inline-flex min-h-10 items-center justify-center rounded-lg bg-cyan-400 px-4 py-2 text-xs font-semibold text-slate-950 transition-colors hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							Download .zip Bundle
+						</button>
+					</div>
+				</div>
+
+				<div
+					data-testid="unit-file-tabs"
+					role="tablist"
+					aria-label="Generated Quadlet unit files"
+					class="mb-2 flex flex-wrap items-center gap-1.5"
+				>
+					{
+						initialResult.ok && (
+							<>
+								<button
+									type="button"
+									role="tab"
+									aria-selected="true"
+									data-combined-tab="all"
+									class="inline-flex min-h-10 max-w-full items-center truncate rounded-md border border-cyan-400/60 bg-cyan-500/20 px-3 py-2 font-mono text-xs font-semibold text-cyan-200"
+								>
+									All Files Combined
+								</button>
+								{initialResult.files.map((file) => (
+									<button
+										type="button"
+										role="tab"
+										aria-selected="false"
+										data-unit-filename={file.filename}
+										class="inline-flex min-h-10 max-w-full items-center truncate rounded-md border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-300 transition-colors hover:border-slate-700 hover:text-white"
+									>
+										{file.filename}
+									</button>
+								))}
+							</>
+						)
+					}
+				</div>
+
+				<textarea
+					id="wb-unit-output"
+					data-testid="unit-output"
+					readonly
+					rows="16"
+					spellcheck="false"
+					class="min-h-[280px] w-full flex-1 rounded-lg border border-slate-800 bg-slate-950 p-3.5 font-mono text-xs leading-relaxed text-emerald-200 sm:min-h-[310px]"
+				>{initialOutputText}</textarea>
+
+				<div class="mt-4 overflow-hidden rounded-lg border border-slate-800 bg-slate-950">
+					<div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/90 bg-slate-900/70 px-3.5 py-2">
+						<p class="text-xs font-semibold uppercase tracking-wider text-slate-300">
+							systemd Deployment &amp; Reload Commands
+						</p>
+						<button
+							type="button"
+							data-copy-commands-btn
+							class="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-semibold text-cyan-200 transition-colors hover:border-cyan-400/60 hover:bg-slate-700 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							Copy Commands
+						</button>
+					</div>
+					<pre
+						data-testid="systemd-commands-box"
+						class="max-w-full overflow-x-auto p-3.5 font-mono text-xs leading-relaxed text-cyan-200"
+					>{initialCommandsText}</pre>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<script>
+	import { trackToolEvent } from '../lib/analytics';
+	import { convertToQuadlet } from '../lib/quadlet-engine';
+	import { SAMPLE_TEMPLATES } from '../lib/sample-templates';
+	import type {
+		GeneratedUnitFile,
+		InstallScope,
+		QuadletConversionResult,
+		SampleTemplateId,
+		SelinuxMode,
+	} from '../lib/types';
+	import { buildZipArchive } from '../lib/zip-packager';
+
+	interface SummaryBadge {
+		key: string;
+		label: string;
+		tone: 'cyan' | 'emerald' | 'indigo' | 'amber' | 'slate';
+	}
+
+	const TONE_CLASSES: Record<SummaryBadge['tone'], string> = {
+		cyan: 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200',
+		emerald: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200',
+		indigo: 'border-sky-500/35 bg-sky-500/10 text-sky-200',
+		amber: 'border-amber-500/40 bg-amber-500/10 text-amber-200',
+		slate: 'border-slate-700/90 bg-slate-950/90 text-slate-300',
+	};
+
+	function getTargetDir(scope: InstallScope): string {
+		return scope === 'rootless' ? '~/.config/containers/systemd/' : '/etc/containers/systemd/';
+	}
+
+	function formatCombinedOutput(files: GeneratedUnitFile[]): string {
+		return files
+			.map((file) => `# === ${file.filename} (${file.installPath}) ===\n${file.content.trimEnd()}`)
+			.join('\n\n');
+	}
+
+	function sanitizeZipPrefix(rawName: string): string {
+		const cleaned = rawName
+			.trim()
+			.toLowerCase()
+			.replace(/[^a-z0-9._-]+/g, '-')
+			.replace(/^-+|-+$/g, '');
+		return cleaned || 'quadlet-stack';
+	}
+
+	function buildSummaryBadges(result: QuadletConversionResult, scope: InstallScope): SummaryBadge[] {
+		const targetDir = getTargetDir(scope);
+		if (!result.ok) {
+			return [
+				{ key: 'containers', label: '0 .container units', tone: 'slate' },
+				{ key: 'network', label: '.network DNS: paused on syntax error', tone: 'amber' },
+				{ key: 'volumes', label: '0 .volume units', tone: 'slate' },
+				{ key: 'install-path', label: `Install path: ${targetDir}`, tone: 'slate' },
+			];
+		}
+
+		const containerCount = result.files.filter((f) => f.unitType === 'container').length;
+		const networkFiles = result.files.filter((f) => f.unitType === 'network');
+		const volumeCount = result.files.filter((f) => f.unitType === 'volume').length;
+		const envFiles = result.files.filter((f) => f.unitType === 'env');
+
+		const badges: SummaryBadge[] = [
+			{
+				key: 'containers',
+				label: `${containerCount} .container ${containerCount === 1 ? 'unit' : 'units'}`,
+				tone: 'cyan',
+			},
+			networkFiles.length > 0
+				? {
+						key: 'network',
+						label: `.network DNS: ${networkFiles[0]!.filename} (aardvark-dns)`,
+						tone: 'emerald',
+				  }
+				: {
+						key: 'network',
+						label: '.network DNS: host / default bridge',
+						tone: 'slate',
+				  },
+			{
+				key: 'volumes',
+				label: `${volumeCount} .volume ${volumeCount === 1 ? 'unit' : 'units'}`,
+				tone: volumeCount > 0 ? 'indigo' : 'slate',
+			},
+		];
+
+		if (envFiles.length > 0) {
+			badges.push({
+				key: 'env',
+				label: `.env secrets: ${envFiles[0]!.filename} (chmod 600)`,
+				tone: 'amber',
+			});
+		}
+
+		badges.push({
+			key: 'install-path',
+			label: `Install path: ${targetDir}`,
+			tone: 'slate',
+		});
+
+		return badges;
+	}
+
+	function initWorkbench(root: HTMLElement): void {
+		const composeInput = root.querySelector<HTMLTextAreaElement>('[data-testid="compose-input"]');
+		const fileUpload = root.querySelector<HTMLInputElement>('[data-testid="file-upload"]');
+		const uploadDropzone = root.querySelector<HTMLElement>('[data-upload-dropzone]');
+		const dropzoneLabel = root.querySelector<HTMLElement>('[data-dropzone-label]');
+		const inputDropTarget = root.querySelector<HTMLElement>('[data-input-drop-target]');
+		const detectedModeBadge = root.querySelector<HTMLElement>('[data-detected-mode-badge]');
+		const templateSelect = root.querySelector<HTMLSelectElement>('[data-testid="template-select"]');
+		const loadTemplateBtn = root.querySelector<HTMLButtonElement>('[data-testid="load-template-btn"]');
+		const quickLoadPills = Array.from(
+			root.querySelectorAll<HTMLButtonElement>('[data-template-pill]'),
+		);
+		const stackNameInput = root.querySelector<HTMLInputElement>('[data-testid="stack-name-input"]');
+		const scopeSelect = root.querySelector<HTMLSelectElement>('[data-testid="scope-select"]');
+		const selinuxSelect = root.querySelector<HTMLSelectElement>('[data-testid="selinux-select"]');
+		const autoUpdateCheckbox = root.querySelector<HTMLInputElement>('[data-testid="auto-update-checkbox"]');
+		const sharedNetworkCheckbox = root.querySelector<HTMLInputElement>('[data-testid="shared-network-checkbox"]');
+		const extractSecretsCheckbox = root.querySelector<HTMLInputElement>('[data-testid="extract-secrets-checkbox"]');
+		const statusBanner = root.querySelector<HTMLElement>('[data-testid="status-banner"]');
+		const unitSummaryPills = root.querySelector<HTMLElement>('[data-testid="unit-summary-pills"]');
+		const warningsList = root.querySelector<HTMLUListElement>('[data-warnings-list]');
+		const unitFileTabs = root.querySelector<HTMLElement>('[data-testid="unit-file-tabs"]');
+		const unitOutput = root.querySelector<HTMLTextAreaElement>('[data-testid="unit-output"]');
+		const systemdCommandsBox = root.querySelector<HTMLElement>('[data-testid="systemd-commands-box"]');
+		const copyCommandsBtn = root.querySelector<HTMLButtonElement>('[data-copy-commands-btn]');
+		const copyUnitBtn = root.querySelector<HTMLButtonElement>('[data-testid="copy-unit-btn"]');
+		const downloadZipBtn = root.querySelector<HTMLButtonElement>('[data-testid="download-zip-btn"]');
+
+		if (
+			!composeInput ||
+			!fileUpload ||
+			!templateSelect ||
+			!loadTemplateBtn ||
+			!stackNameInput ||
+			!scopeSelect ||
+			!selinuxSelect ||
+			!autoUpdateCheckbox ||
+			!sharedNetworkCheckbox ||
+			!extractSecretsCheckbox ||
+			!statusBanner ||
+			!unitSummaryPills ||
+			!warningsList ||
+			!unitFileTabs ||
+			!unitOutput ||
+			!systemdCommandsBox ||
+			!copyUnitBtn ||
+			!downloadZipBtn
+		) {
+			return;
+		}
+
+		let activeUnitFilename: string | null = null;
+		let currentResult: QuadletConversionResult | null = null;
+		let stackNameEditedByUser = false;
+
+		const syncQuickLoadPills = (activeId: SampleTemplateId | null): void => {
+			for (const pill of quickLoadPills) {
+				const pillId = pill.getAttribute('data-template-pill');
+				const isActive = activeId !== null && pillId === activeId;
+				pill.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+				pill.className = isActive
+					? 'inline-flex min-h-10 max-w-full items-center gap-1.5 rounded-lg border border-cyan-400/70 bg-cyan-500/20 px-3 py-2 font-mono text-xs font-medium text-cyan-100 shadow-sm shadow-cyan-950/50 transition-colors'
+					: 'inline-flex min-h-10 max-w-full items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-950/90 px-3 py-2 font-mono text-xs font-medium text-slate-300 transition-colors hover:border-cyan-500/40 hover:bg-slate-900 hover:text-white';
+				const dot = pill.querySelector<HTMLElement>('[data-pill-dot]');
+				if (dot) {
+					dot.className = isActive
+						? 'h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300'
+						: 'h-1.5 w-1.5 shrink-0 rounded-full bg-slate-600';
+				}
+			}
+		};
+
+		const renderSummaryPills = (result: QuadletConversionResult, scope: InstallScope): void => {
+			unitSummaryPills.replaceChildren();
+			const badges = buildSummaryBadges(result, scope);
+			for (const badge of badges) {
+				const span = document.createElement('span');
+				span.setAttribute('data-summary-pill', badge.key);
+				span.className = `inline-flex max-w-full items-center rounded-md border px-2.5 py-1 font-mono text-xs break-all sm:break-normal ${TONE_CLASSES[badge.tone]}`;
+				span.textContent = badge.label;
+				unitSummaryPills.appendChild(span);
+			}
+		};
+
+		const renderTabsAndOutput = (files: GeneratedUnitFile[]): void => {
+			if (activeUnitFilename !== null && !files.some((f) => f.filename === activeUnitFilename)) {
+				activeUnitFilename = null;
+			}
+
+			unitFileTabs.replaceChildren();
+
+			const activeTabClass =
+				'inline-flex min-h-10 max-w-full items-center truncate rounded-md border border-cyan-400/60 bg-cyan-500/20 px-3 py-2 font-mono text-xs font-semibold text-cyan-200';
+			const inactiveTabClass =
+				'inline-flex min-h-10 max-w-full items-center truncate rounded-md border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-300 transition-colors hover:border-slate-700 hover:text-white';
+
+			const combinedBtn = document.createElement('button');
+			combinedBtn.type = 'button';
+			combinedBtn.setAttribute('role', 'tab');
+			combinedBtn.setAttribute('data-combined-tab', 'all');
+			const isCombinedActive = activeUnitFilename === null;
+			combinedBtn.setAttribute('aria-selected', isCombinedActive ? 'true' : 'false');
+			combinedBtn.className = isCombinedActive ? activeTabClass : inactiveTabClass;
+			combinedBtn.textContent = 'All Files Combined';
+			unitFileTabs.appendChild(combinedBtn);
+
+			for (const file of files) {
+				const tabBtn = document.createElement('button');
+				tabBtn.type = 'button';
+				tabBtn.setAttribute('role', 'tab');
+				tabBtn.setAttribute('data-unit-filename', file.filename);
+				const isTabActive = activeUnitFilename === file.filename;
+				tabBtn.setAttribute('aria-selected', isTabActive ? 'true' : 'false');
+				tabBtn.className = isTabActive ? activeTabClass : inactiveTabClass;
+				tabBtn.textContent = file.filename;
+				unitFileTabs.appendChild(tabBtn);
+			}
+
+			if (activeUnitFilename === null) {
+				unitOutput.value = formatCombinedOutput(files);
+			} else {
+				const matched = files.find((f) => f.filename === activeUnitFilename);
+				unitOutput.value = matched ? matched.content : formatCombinedOutput(files);
+			}
+		};
+
+		const runConversion = (): void => {
+			const installScope = (scopeSelect.value === 'rootful' ? 'rootful' : 'rootless') as InstallScope;
+			const selinuxMode = (
+				selinuxSelect.value === 'shared-z' || selinuxSelect.value === 'private-Z'
+					? selinuxSelect.value
+					: 'none'
+			) as SelinuxMode;
+
+			const result = convertToQuadlet(composeInput.value, {
+				stackName: stackNameInput.value.trim() || 'webapp',
+				installScope,
+				selinuxMode,
+				enableAutoUpdate: autoUpdateCheckbox.checked,
+				generateSharedNetwork: sharedNetworkCheckbox.checked,
+				extractSecretsToEnvFile: extractSecretsCheckbox.checked,
+			});
+
+			currentResult = result;
+			renderSummaryPills(result, installScope);
+
+			if (result.ok) {
+				const targetDir = getTargetDir(installScope);
+				statusBanner.setAttribute('data-status', 'ok');
+				statusBanner.className =
+					'mt-4 break-words rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 font-mono text-xs text-emerald-200';
+				statusBanner.textContent = `Detected mode: ${result.inputMode} | Generated units: ${result.files.length} (${result.serviceCount} ${result.serviceCount === 1 ? 'service' : 'services'}) | Target directory: ${targetDir}`;
+
+				if (detectedModeBadge) {
+					detectedModeBadge.textContent = `Mode: ${result.inputMode}`;
+				}
+
+				warningsList.replaceChildren();
+				if (result.warnings.length > 0) {
+					warningsList.classList.remove('hidden');
+					for (const warning of result.warnings) {
+						const item = document.createElement('li');
+						item.className = 'break-words';
+						const prefix = warning.service ? `[${warning.service}] ` : '';
+						item.textContent = `${prefix}${warning.field}: ${warning.message}`;
+						warningsList.appendChild(item);
+					}
+				} else {
+					warningsList.classList.add('hidden');
+				}
+
+				renderTabsAndOutput(result.files);
+				systemdCommandsBox.textContent = result.systemdCommands.join('\n');
+				copyUnitBtn.disabled = false;
+				downloadZipBtn.disabled = false;
+				if (copyCommandsBtn) {
+					copyCommandsBtn.disabled = false;
+				}
+			} else {
+				statusBanner.setAttribute('data-status', 'error');
+				statusBanner.className =
+					'mt-4 break-words rounded-lg border border-rose-500/40 bg-rose-500/15 px-4 py-2.5 font-mono text-xs text-rose-200';
+				statusBanner.textContent = `Conversion error: ${result.error}`;
+				if (detectedModeBadge) {
+					detectedModeBadge.textContent = 'Mode: syntax check';
+				}
+				warningsList.replaceChildren();
+				warningsList.classList.add('hidden');
+				unitFileTabs.replaceChildren();
+				unitOutput.value = '';
+				systemdCommandsBox.textContent = '';
+				copyUnitBtn.disabled = true;
+				downloadZipBtn.disabled = true;
+				if (copyCommandsBtn) {
+					copyCommandsBtn.disabled = true;
+				}
+			}
+		};
+
+		const loadTemplateById = (selectedId: SampleTemplateId): void => {
+			const template = SAMPLE_TEMPLATES[selectedId];
+			if (!template) {
+				return;
+			}
+			templateSelect.value = selectedId;
+			composeInput.value = template.content;
+			if (!stackNameEditedByUser) {
+				stackNameInput.value = template.stackName;
+			}
+			if (dropzoneLabel) {
+				dropzoneLabel.textContent = 'Drop compose.yaml / .txt here or browse';
+			}
+			activeUnitFilename = null;
+			syncQuickLoadPills(selectedId);
+			runConversion();
+			trackToolEvent('template_loaded', { template: selectedId });
+		};
+
+		const ingestLocalFile = async (file: File): Promise<void> => {
+			const text = await file.text();
+			composeInput.value = text;
+			activeUnitFilename = null;
+			syncQuickLoadPills(null);
+			if (dropzoneLabel) {
+				dropzoneLabel.textContent = 'Loaded local file into editor';
+			}
+			runConversion();
+		};
+
+		const bindDropSurface = (surface: HTMLElement | null): void => {
+			if (!surface) {
+				return;
+			}
+			let dragDepth = 0;
+
+			const setDragHighlight = (active: boolean): void => {
+				const state = active ? 'true' : 'false';
+				surface.setAttribute('data-drag-active', state);
+				if (uploadDropzone) {
+					uploadDropzone.setAttribute('data-drag-active', state);
+				}
+			};
+
+			surface.addEventListener('dragenter', (event) => {
+				event.preventDefault();
+				dragDepth += 1;
+				setDragHighlight(true);
+			});
+
+			surface.addEventListener('dragover', (event) => {
+				event.preventDefault();
+				if (event.dataTransfer) {
+					event.dataTransfer.dropEffect = 'copy';
+				}
+				setDragHighlight(true);
+			});
+
+			surface.addEventListener('dragleave', (event) => {
+				event.preventDefault();
+				dragDepth = Math.max(0, dragDepth - 1);
+				if (dragDepth === 0) {
+					setDragHighlight(false);
+				}
+			});
+
+			surface.addEventListener('drop', async (event) => {
+				event.preventDefault();
+				dragDepth = 0;
+				setDragHighlight(false);
+				const droppedFile = event.dataTransfer?.files?.[0];
+				if (droppedFile) {
+					await ingestLocalFile(droppedFile);
+				}
+			});
+		};
+
+		bindDropSurface(uploadDropzone);
+		bindDropSurface(inputDropTarget);
+
+		for (const pill of quickLoadPills) {
+			pill.addEventListener('click', () => {
+				const pillId = pill.getAttribute('data-template-pill') as SampleTemplateId | null;
+				if (pillId && SAMPLE_TEMPLATES[pillId]) {
+					loadTemplateById(pillId);
+				}
+			});
+		}
+
+		composeInput.addEventListener('input', () => {
+			const currentTemplate = SAMPLE_TEMPLATES[templateSelect.value as SampleTemplateId];
+			if (!currentTemplate || composeInput.value !== currentTemplate.content) {
+				syncQuickLoadPills(null);
+			}
+			runConversion();
+		});
+
+		stackNameInput.addEventListener('input', () => {
+			stackNameEditedByUser = true;
+			runConversion();
+		});
+
+		templateSelect.addEventListener('change', () => {
+			loadTemplateById(templateSelect.value as SampleTemplateId);
+		});
+
+		loadTemplateBtn.addEventListener('click', () => {
+			loadTemplateById(templateSelect.value as SampleTemplateId);
+		});
+
+		scopeSelect.addEventListener('change', () => {
+			runConversion();
+		});
+
+		selinuxSelect.addEventListener('change', () => {
+			runConversion();
+		});
+
+		autoUpdateCheckbox.addEventListener('change', () => {
+			runConversion();
+		});
+
+		sharedNetworkCheckbox.addEventListener('change', () => {
+			runConversion();
+		});
+
+		extractSecretsCheckbox.addEventListener('change', () => {
+			runConversion();
+		});
+
+		fileUpload.addEventListener('change', async () => {
+			const file = fileUpload.files?.[0];
+			if (!file) {
+				return;
+			}
+			await ingestLocalFile(file);
+			fileUpload.value = '';
+		});
+
+		unitFileTabs.addEventListener('click', (event) => {
+			const target = event.target;
+			if (!(target instanceof HTMLElement)) {
+				return;
+			}
+			const button = target.closest('button');
+			if (!button || !currentResult || !currentResult.ok) {
+				return;
+			}
+			const filenameAttr = button.getAttribute('data-unit-filename');
+			if (filenameAttr) {
+				activeUnitFilename = filenameAttr;
+			} else if (button.hasAttribute('data-combined-tab')) {
+				activeUnitFilename = null;
+			} else {
+				return;
+			}
+			renderTabsAndOutput(currentResult.files);
+		});
+
+		copyUnitBtn.addEventListener('click', async () => {
+			if (!currentResult || !currentResult.ok || !unitOutput.value) {
+				return;
+			}
+			if (navigator.clipboard?.writeText) {
+				await navigator.clipboard.writeText(unitOutput.value);
+			}
+			trackToolEvent('quadlet_export', {
+				action: 'copy',
+				unit_count: currentResult.files.length,
+			});
+			const originalLabel = copyUnitBtn.textContent ?? 'Copy Active Output';
+			copyUnitBtn.textContent = 'Copied!';
+			window.setTimeout(() => {
+				copyUnitBtn.textContent = originalLabel;
+			}, 1600);
+		});
+
+		if (copyCommandsBtn) {
+			copyCommandsBtn.addEventListener('click', async () => {
+				const commandsText = systemdCommandsBox.textContent?.trim() ?? '';
+				if (!currentResult || !currentResult.ok || !commandsText) {
+					return;
+				}
+				if (navigator.clipboard?.writeText) {
+					await navigator.clipboard.writeText(commandsText);
+				}
+				trackToolEvent('quadlet_export', {
+					action: 'copy',
+					unit_count: currentResult.files.length,
+				});
+				const originalLabel = copyCommandsBtn.textContent ?? 'Copy Commands';
+				copyCommandsBtn.textContent = 'Copied!';
+				window.setTimeout(() => {
+					copyCommandsBtn.textContent = originalLabel;
+				}, 1600);
+			});
+		}
+
+		downloadZipBtn.addEventListener('click', () => {
+			if (!currentResult || !currentResult.ok || currentResult.files.length === 0) {
+				return;
+			}
+			const zipBytes = buildZipArchive(currentResult.files);
+			const blob = new Blob([zipBytes], { type: 'application/zip' });
+			const zipPrefix = sanitizeZipPrefix(stackNameInput.value);
+			const downloadUrl = URL.createObjectURL(blob);
+			const anchor = document.createElement('a');
+			anchor.href = downloadUrl;
+			anchor.download = `${zipPrefix}-quadlet.zip`;
+			document.body.appendChild(anchor);
+			anchor.click();
+			anchor.remove();
+			window.setTimeout(() => {
+				URL.revokeObjectURL(downloadUrl);
+			}, 1500);
+			trackToolEvent('quadlet_export', {
+				action: 'zip',
+				unit_count: currentResult.files.length,
+			});
+		});
+
+		runConversion();
+	}
+
+	document.querySelectorAll<HTMLElement>('[data-workbench-root]').forEach((node) => {
+		initWorkbench(node);
+	});
+</script>
