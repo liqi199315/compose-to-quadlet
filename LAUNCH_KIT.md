@@ -45,7 +45,7 @@ Live web app (free, zero login, 100% client-side):
 https://quadletgen.com
 
 Standalone Node CLI for CI/CD pipelines and shell scripts:
-https://github.com/dake/compose-to-quadlet
+https://github.com/liqi199315/compose-to-quadlet
 
 Clean-room MIT license. Pull requests and feedback welcome!
 ```
@@ -146,7 +146,7 @@ I built QuadletGen (https://quadletgen.com) to make Compose to Quadlet migration
 - One-click ZIP download: Download all units ready to unpack into ~/.config/containers/systemd/.
 - Standalone CLI included: Also bundled as an open-source Node ESM CLI for terminal workflows and CI/CD.
 
-Project is MIT licensed and independent. Check it out at https://quadletgen.com or inspect the code at https://github.com/dake/compose-to-quadlet.
+Project is MIT licensed and independent. Check it out at https://quadletgen.com or inspect the code at https://github.com/liqi199315/compose-to-quadlet.
 
 Feedback and suggestions on edge cases are very welcome!
 ```
@@ -214,7 +214,7 @@ I would like to submit QuadletGen for editorial consideration in Console.dev:
 
 Tool name: QuadletGen
 URL: https://quadletgen.com
-GitHub: https://github.com/dake/compose-to-quadlet
+GitHub: https://github.com/liqi199315/compose-to-quadlet
 License: MIT
 
 What it does:
