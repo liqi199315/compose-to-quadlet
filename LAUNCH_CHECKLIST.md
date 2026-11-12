@@ -32,9 +32,9 @@ Confirm all four gates pass:
 
 ## 3. GA4 Property & Shared Analytics Registry (`[人工]` + `[AI]`)
 
-- [ ] In Google Analytics 4, create a property and Web Data Stream for **`https://quadletgen.com`** and copy the public Measurement ID (`G-XXXXXXXXXX`) plus numeric Property ID.
+- [x] In Google Analytics 4, create a property and Web Data Stream for **`https://quadletgen.com`** and copy the public Measurement ID plus numeric Property ID. Done 2026-11-12: Property ID `564011383`, Stream ID `16325768198`, Measurement ID `G-PK7MR29S6E`, time zone `Asia/Shanghai`, currency `USD`, industry `TECHNOLOGY`. Event retention `FOURTEEN_MONTHS` with reset on new activity. Enhanced measurement site search and form interactions set to off. Key Event `quadlet_export` uses `ONCE_PER_EVENT`.
 - [ ] In GA4 Admin -> Data Collection, keep **Google Signals disabled** and **Ads Personalization disabled** so production behavior matches `/privacy/`.
-- [ ] In GA4 Admin -> Events / Key Events, mark **`quadlet_export`** as a Key Event once first production events arrive.
+- [x] In GA4 Admin -> Events / Key Events, mark **`quadlet_export`** as a Key Event. Created 2026-11-12 as `properties/564011383/keyEvents/16325186130` with `ONCE_PER_EVENT` before the first production hit.
 - [ ] Grant `Viewer` access on the GA4 property to `build-android@charged-sector-382503.iam.gserviceaccount.com` per `../../40_shared/ANALYTICS.md`.
 - [ ] Add public IDs only (never secret keys) under `sites.composetoquadlet` in `/Users/dake/Projects/aiapp/40_shared/analytics-sites.yaml` (matching `--project composetoquadlet` in `package.json`):
   ```yaml
@@ -57,15 +57,14 @@ Confirm all four gates pass:
   openssl rand -hex 16
   ```
 - [ ] Write that single key string into both `public/indexnow-key.txt` and `public/<key>.txt` (e.g. `public/c9d2e4f73a814b629d4c35e8f2a16c53.txt`, replacing any default development key) so `https://quadletgen.com/indexnow-key.txt` and `https://quadletgen.com/<key>.txt` serve the exact key over HTTPS for Bing/Yandex verification.
-- [ ] Build with production environment variables and deploy to Cloudflare Workers Static Assets:
+- [x] Build with production environment variables and deploy to Cloudflare Workers Static Assets. Done 2026-11-12 with `PUBLIC_SITE_URL=https://quadletgen.com` and `PUBLIC_GA4_MEASUREMENT_ID=G-PK7MR29S6E`. `launch-preflight` and `seo:check` both reported `ok: true` (`routesChecked: 9`). Deploy command was `npx wrangler deploy --domains quadletgen.com`.
   ```bash
   PUBLIC_SITE_URL=https://quadletgen.com \
-  PUBLIC_GA4_MEASUREMENT_ID=G-XXXXXXXXXX \
-  npm run cf:deploy
+  PUBLIC_GA4_MEASUREMENT_ID=G-PK7MR29S6E \
+  npm run build
+  npx wrangler deploy --domains quadletgen.com
   ```
-- [ ] In Cloudflare Dashboard -> Workers & Pages -> `compose-to-quadlet` -> Settings -> Domains & Routes:
-  - Attach custom domain **`quadletgen.com`**.
-  - Configure a `301` redirect rule from `https://www.quadletgen.com/*` to `https://quadletgen.com/$1`.
+- [x] Cloudflare Workers custom domain **`quadletgen.com`** is attached to Worker `compose-to-quadlet`. Version ID `5d9f6d3a-eb30-4899-b80c-e671203e5d13`. Workers.dev URL: `https://compose-to-quadlet.liqi199315.workers.dev`. `https://www.quadletgen.com/` returns `301` to `https://quadletgen.com/`.
 - [ ] Smoke-test live production URLs:
   - `curl -I https://quadletgen.com/` (HTTP 200 + security headers from `_headers`)
   - `curl -I https://quadletgen.com/about/` (HTTP 200)
@@ -79,10 +78,10 @@ Confirm all four gates pass:
 
 ## 5. GSC, Bing Webmaster Tools & IndexNow Submission (`[人工]` + `[AI]`)
 
-- [ ] **Google Search Console**:
-  - Add domain property `sc-domain:quadletgen.com` and verify via Cloudflare DNS TXT record.
-  - Grant `Full` (`siteFullUser`) permission to `build-android@charged-sector-382503.iam.gserviceaccount.com`.
-  - Submit `https://quadletgen.com/sitemap-index.xml`.
+- [x] **Google Search Console** (2026-11-12):
+  - Domain property `sc-domain:quadletgen.com` verified with Site Verification `DNS_TXT` (resource ID `dns://quadletgen.com`). Verified owners: `build-android@charged-sector-382503.iam.gserviceaccount.com` and `liqi199315@gmail.com`.
+  - Search Console site registration PUT returned `204`; GET returned `200` with `permissionLevel=siteOwner`.
+  - Sitemap `https://quadletgen.com/sitemap-index.xml` submitted: PUT `204`, GET `200`, `lastSubmitted=2026-11-12T07:54:30.598Z`, pending at submit time, warnings `0`, errors `0`.
 - [ ] **Bing Webmaster Tools**:
   - Import `https://quadletgen.com/` directly from GSC (or verify via DNS CNAME/TXT) under the account linked to `40_shared/bing-webmaster.key`.
   - Submit `https://quadletgen.com/sitemap-index.xml`.
@@ -110,6 +109,7 @@ Confirm all four gates pass:
     }"
   ```
   Confirm HTTP `200` or `202` response from `api.indexnow.org`.
+  Done 2026-11-12 via `ping-indexnow.mjs --dist dist`: HTTP `202`, host `quadletgen.com`, keyLocation `https://quadletgen.com/indexnow-key.txt`, `submittedCount: 9`.
 - [ ] Run shared reporting sanity checks from `/Users/dake/Projects/aiapp/30_products/compose-to-quadlet`:
   ```bash
   npm run ga4:report
@@ -150,5 +150,5 @@ Apply only **after** `https://quadletgen.com/`, `/about/`, `/privacy/`, and `/te
   ```bash
   python3 /Users/dake/Projects/aiapp/_ops/generate-project-index.py
   ```
-- [ ] Update `PLAN_90DAY.md` tasks `P0-2` and `P0-3` to `已完成（YYYY-MM-DD）` and append launch evidence to `NOW.md`.
+- [x] Launch evidence for domain, Worker, GA4, GSC, sitemap, and IndexNow is recorded in `NOW.md` (2026-11-12). `PLAN_90DAY.md` status lines were not edited in this pass. Bing import and `analytics-sites.yaml` registration remain open, so P0-3 is not fully closed.
 - [ ] Freeze `<title>` and `<meta name="description">` tags across all 9 routes for 28 days (`P0-5`) before running CTR experiments.
