@@ -7436,8 +7436,17 @@ var VALUE_FLAG_HANDLERS = {
   "--user": (s, v) => {
     s.user = v.trim();
   },
+  "--userns": (s, v) => {
+    s.userNs = v.trim();
+  },
   "--cap-add": (s, v) => s.capAdd.push(v.trim()),
   "--cap-drop": (s, v) => s.capDrop.push(v.trim()),
+  "--group-add": (s, v) => {
+    const group = v.trim();
+    if (group) {
+      s.groupAdd.push(group);
+    }
+  },
   "--device": (s, v) => s.devices.push(v.trim()),
   "-l": (s, v) => s.labels.push(v.trim()),
   "--label": (s, v) => s.labels.push(v.trim()),
@@ -7559,6 +7568,7 @@ function createEmptyService(name) {
     dependsOn: [],
     capAdd: [],
     capDrop: [],
+    groupAdd: [],
     devices: [],
     labels: [],
     readOnly: false,
@@ -8025,12 +8035,20 @@ function normalizeComposeService(serviceKey, rawSvc, stackName, stack) {
   if (Array.isArray(rawSvc.depends_on)) {
     for (const dep of rawSvc.depends_on) {
       if (typeof dep === "string" && dep.trim()) {
-        service.dependsOn.push(dep.trim());
+        service.dependsOn.push({
+          name: dep.trim(),
+          condition: "service_started",
+          required: true
+        });
       }
     }
   } else if (isRecord(rawSvc.depends_on)) {
-    for (const dep of Object.keys(rawSvc.depends_on)) {
-      service.dependsOn.push(dep);
+    for (const [depName, depSpec] of Object.entries(rawSvc.depends_on)) {
+      const name = depName.trim();
+      if (!name) {
+        continue;
+      }
+      service.dependsOn.push(readDependsSpec(depSpec, serviceKey, name, stack));
     }
   }
   if (typeof rawSvc.restart === "string") {
@@ -8038,6 +8056,19 @@ function normalizeComposeService(serviceKey, rawSvc, stackName, stack) {
   }
   if (typeof rawSvc.user === "string" || typeof rawSvc.user === "number") {
     service.user = String(rawSvc.user);
+  }
+  if (typeof rawSvc.userns_mode === "string" && rawSvc.userns_mode.trim()) {
+    service.userNs = rawSvc.userns_mode.trim();
+  }
+  if (Array.isArray(rawSvc.group_add)) {
+    for (const group of rawSvc.group_add) {
+      if (typeof group === "string" || typeof group === "number") {
+        const value = String(group).trim();
+        if (value) {
+          service.groupAdd.push(value);
+        }
+      }
+    }
   }
   if (typeof rawSvc.working_dir === "string") {
     service.workingDir = rawSvc.working_dir.trim();
@@ -8150,6 +8181,91 @@ function collectUnsupportedServiceWarnings(serviceKey, rawSvc, warnings) {
       message: "Service configs are not supported by Quadlet. Mount read-only host files with Volume= instead."
     });
   }
+}
+function readDependsSpec(raw, serviceKey, depName, stack) {
+  let condition = "service_started";
+  let required = true;
+  if (isRecord(raw)) {
+    if (raw.required === false) {
+      required = false;
+    }
+    if (typeof raw.condition === "string" && raw.condition.trim()) {
+      const value = raw.condition.trim();
+      if (value === "service_started" || value === "service_healthy" || value === "service_completed_successfully") {
+        condition = value;
+      } else {
+        stack.warnings.push({
+          service: serviceKey,
+          field: "depends_on",
+          message: `Condition ${value} on ${depName} is not a Compose condition this converter maps. Treated as service_started.`
+        });
+      }
+    }
+  }
+  return { name: depName, condition, required };
+}
+function servicesNeedingHealthyNotify(stack, warnings) {
+  const known = new Set(stack.services.map((svc) => svc.name));
+  const healthyWaiters = /* @__PURE__ */ new Map();
+  const startedWaiters = /* @__PURE__ */ new Map();
+  for (const svc of stack.services) {
+    for (const dep of svc.dependsOn) {
+      if (!known.has(dep.name)) {
+        warnings.push({
+          service: svc.name,
+          field: "depends_on",
+          message: `Service ${dep.name} is not defined in this Compose file. After= was still written, and systemd will not start ${svc.name} until that unit exists.`
+        });
+      }
+      if (!dep.required) {
+        warnings.push({
+          service: svc.name,
+          field: "depends_on",
+          message: `${dep.name} sets required: false. The unit uses Wants= and After= so a stopped dependency does not fail ${svc.name}.`
+        });
+      }
+      if (dep.condition === "service_completed_successfully") {
+        warnings.push({
+          service: svc.name,
+          field: "depends_on",
+          message: `Compose condition service_completed_successfully for ${dep.name} has no Quadlet key. After= only orders the start. A one-shot init container needs Type=oneshot and RemainAfterExit=yes added by hand on ${sanitizeUnitName(dep.name)}.container.`
+        });
+      } else if (dep.condition === "service_healthy") {
+        const list = healthyWaiters.get(dep.name) ?? [];
+        list.push(svc.name);
+        healthyWaiters.set(dep.name, list);
+      } else {
+        const list = startedWaiters.get(dep.name) ?? [];
+        list.push(svc.name);
+        startedWaiters.set(dep.name, list);
+      }
+    }
+  }
+  const notifyHealthy = /* @__PURE__ */ new Set();
+  for (const [depName, waiters] of healthyWaiters) {
+    const depSvc = stack.services.find((svc) => svc.name === depName);
+    if (!depSvc) {
+      continue;
+    }
+    if (!depSvc.healthcheck?.cmd) {
+      warnings.push({
+        service: depName,
+        field: "healthcheck",
+        message: `${waiters.join(", ")} wait with condition service_healthy, but ${depName} has no healthcheck.test. Notify=healthy was left off because Podman would never report the unit started.`
+      });
+      continue;
+    }
+    notifyHealthy.add(depName);
+    const alsoStarted = startedWaiters.get(depName) ?? [];
+    if (alsoStarted.length > 0) {
+      warnings.push({
+        service: depName,
+        field: "depends_on",
+        message: `${waiters.join(", ")} wait for service_healthy and ${alsoStarted.join(", ")} wait for service_started. Notify=healthy makes every After= dependency wait for the healthcheck, which is stricter than Compose service_started.`
+      });
+    }
+  }
+  return notifyHealthy;
 }
 function formatComposePort(port) {
   if (typeof port === "number") {
@@ -8322,6 +8438,7 @@ function emitQuadletUnits(stack, inputMode, options) {
   }
   const extractedSecrets = /* @__PURE__ */ new Map();
   const warnings = [...stack.warnings];
+  const notifyHealthy = servicesNeedingHealthyNotify(stack, warnings);
   const containerFiles = [];
   for (const svc of stack.services) {
     const inlineEnv = [];
@@ -8351,7 +8468,8 @@ function emitQuadletUnits(stack, inputMode, options) {
       useSharedNetwork,
       volumeUnitMap,
       inlineEnv,
-      secretEnvFileRef: serviceUsesSecretEnvFile ? systemdEnvFileRef : void 0
+      secretEnvFileRef: serviceUsesSecretEnvFile ? systemdEnvFileRef : void 0,
+      notifyHealthy: notifyHealthy.has(svc.name)
     });
     const filename = `${svc.unitName}.container`;
     containerFiles.push({
@@ -8433,9 +8551,9 @@ function renderContainerUnit(svc, ctx) {
     unitLines.push(`After=${ctx.stackName}-network.service`);
   }
   for (const dep of svc.dependsOn) {
-    const depUnit = `${sanitizeUnitName(dep)}.service`;
+    const depUnit = `${sanitizeUnitName(dep.name)}.service`;
     unitLines.push(`After=${depUnit}`);
-    unitLines.push(`Requires=${depUnit}`);
+    unitLines.push(`${dep.required ? "Requires" : "Wants"}=${depUnit}`);
   }
   const containerLines = [
     "[Container]",
@@ -8462,6 +8580,12 @@ function renderContainerUnit(svc, ctx) {
   }
   if (svc.user) {
     containerLines.push(`User=${svc.user}`);
+  }
+  if (svc.userNs) {
+    containerLines.push(`UserNS=${svc.userNs}`);
+  }
+  for (const group of svc.groupAdd) {
+    containerLines.push(`GroupAdd=${group}`);
   }
   if (svc.workingDir) {
     containerLines.push(`WorkingDir=${svc.workingDir}`);
@@ -8530,6 +8654,9 @@ function renderContainerUnit(svc, ctx) {
     if (svc.healthcheck.startPeriod) {
       containerLines.push(`HealthStartPeriod=${svc.healthcheck.startPeriod}`);
     }
+  }
+  if (ctx.notifyHealthy) {
+    containerLines.push("Notify=healthy");
   }
   const serviceLines = [
     "[Service]",

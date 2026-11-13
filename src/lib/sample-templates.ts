@@ -214,6 +214,8 @@ volumes:
   --name jellyfin \\
   --hostname jellyfin-box \\
   --user 1000:1000 \\
+  --userns keep-id \\
+  --group-add keep-groups \\
   -p 8096:8096 \\
   -p 8920:8920 \\
   -v /srv/jellyfin/config:/config \\
@@ -225,6 +227,100 @@ volumes:
   --cap-add SYS_NICE \\
   --label "app.tier=media" \\
   --restart unless-stopped \\
-  jellyfin/jellyfin:latest`,
+  docker.io/jellyfin/jellyfin:latest`,
+	},
+	'healthcheck-depends': {
+		label: 'API waits for Postgres service_healthy',
+		stackName: 'app',
+		mode: 'compose-yaml',
+		content: `services:
+  api:
+    image: docker.io/library/node:22-alpine
+    working_dir: /srv/app
+    command: ["node", "server.js"]
+    ports:
+      - "8080:3000"
+    environment:
+      DATABASE_URL: postgres://app@db:5432/app
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_DB: app
+      POSTGRES_PASSWORD: sample-db-password
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  db-data:
+`,
+	},
+	'rootless-boot-nginx': {
+		label: 'Rootless nginx that should start at boot',
+		stackName: 'site',
+		mode: 'compose-yaml',
+		content: `services:
+  web:
+    image: docker.io/library/nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+`,
+	},
+	'pihole-rootless': {
+		label: 'Rootless Pi-hole DNS (port 53, web on 8080)',
+		stackName: 'pihole',
+		mode: 'compose-yaml',
+		content: `services:
+  pihole:
+    image: docker.io/pihole/pihole:latest
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "8080:80/tcp"
+    environment:
+      TZ: UTC
+      FTLCONF_webserver_api_password: sample-pihole-web-password
+      FTLCONF_dns_listeningMode: ALL
+    volumes:
+      - /srv/pihole/etc-pihole:/etc/pihole
+    restart: unless-stopped
+`,
+	},
+	'quadlet-vs-compose': {
+		label: 'Caddy proxy + whoami (Compose vs Quadlet)',
+		stackName: 'edge',
+		mode: 'compose-yaml',
+		content: `services:
+  proxy:
+    image: docker.io/library/caddy:2-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - /srv/edge/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  api:
+    image: docker.io/traefik/whoami:v1.10
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+`,
 	},
 };

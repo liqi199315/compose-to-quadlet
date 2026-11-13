@@ -19,22 +19,27 @@
 ## 已就绪准产资产清单
 
 - **多模式转换引擎与类型契约（`src/lib/`）**：支持 `compose-yaml` 与 `docker-run` / `podman-run` 输入解析，`rootless` / `rootful` 安装目录切换，`none` / `shared-z` / `private-Z` SELinux 卷重打标，自动合成共享 `.network` 单元解决容器间 DNS 解析（`podlet#190`），敏感环境变量分离至 `.env`，以及纯前端 PKZIP 归档打包。
-- **9 个静态内容路由（6 个工具页 + 3 个 E-E-A-T 信任与合规页）**：
+- **14 个静态内容路由（11 个工具页 + 3 个 E-E-A-T 信任与合规页）**：
   1. `/`（Docker Compose to Quadlet 主工作台）
   2. `/podman-quadlet-generator/`（Podman Quadlet 生成器与 AutoUpdate 预设）
   3. `/docker-run-to-quadlet-converter/`（Docker Run / Podman Run 转 Quadlet 转换器）
   4. `/rootless-quadlet-selinux-volume-generator/`（Rootless Quadlet SELinux `:z` / `:Z` 卷生成器）
   5. `/immich-nextcloud-vaultwarden-quadlet-templates/`（Immich / Nextcloud / Vaultwarden 多容器模板）
   6. `/podlet-online-multi-container-network-packager/`（免装 Rust CLI 的在线多容器网络与 ZIP 打包器）
-  7. `/about/`（Podman 4.4+/5.x `podman-system-generator` 规范对齐说明、共享 `.network` 解决 `podlet#190` 跨容器 DNS 原理、100% 本地内存运行架构、非官方声明与 `hello@quadletgen.com` 联系入口）
-  8. `/privacy/`（`docker-compose.yml` 与密钥零上传承诺、匿名化 GA4 事件策略、GDPR 与 CCPA/CPRA 权利说明）
-  9. `/terms/`（MIT 开源使用条款、上线前测试环境审查 systemd 单元与 SELinux 标签的操作员责任、Linux VPS `rel="sponsored"` 联盟披露规范）
+  7. `/quadlet-depends-on-healthcheck/`（`depends_on` `service_healthy` 到 `Notify=healthy`）
+  8. `/quadlet-not-starting-on-boot/`（rootless `WantedBy=default.target` 与 linger）
+  9. `/podman-pihole-quadlet/`（rootless Pi-hole，端口 53）
+  10. `/jellyfin-podman-quadlet/`（既有 Jellyfin docker run 模板，`/dev/dri`）
+  11. `/quadlet-vs-docker-compose/`（同一栈对照并链到以上四页）
+  12. `/about/`（Podman 4.4+/5.x `podman-system-generator` 规范对齐说明、共享 `.network` 解决 `podlet#190` 跨容器 DNS 原理、100% 本地内存运行架构、非官方声明与 `hello@quadletgen.com` 联系入口）
+  13. `/privacy/`（`docker-compose.yml` 与密钥零上传承诺、匿名化 GA4 事件策略、GDPR 与 CCPA/CPRA 权利说明）
+  14. `/terms/`（MIT 开源使用条款、上线前测试环境审查 systemd 单元与 SELinux 标签的操作员责任、Linux VPS `rel="sponsored"` 联盟披露规范）
 - **全套技术 SEO 与安全静态产物**：`404.html`、`sitemap-index.xml`、`robots.txt`、`llms.txt`、`_headers`（含 `workers.dev` 与 `pages.dev` 预览域名 `X-Robots-Tag: noindex` 防串台头）、`og-image.svg`、`og-image.png`（1200x630 栅格化社交流览卡片）、`github-social-preview.png`（1280x640 GitHub 社交预览卡片）、`site.webmanifest`、`indexnow-key.txt` 以及 `c9d2e4f73a814b629d4c35e8f2a16c53.txt` 双重 IndexNow 探测校验文件。
 - **独立 Node ESM CLI 与完整测试套件（`bin/compose-to-quadlet.mjs`、`tests/cli.test.ts`）**：通过 esbuild 独立打包 `src/cli.ts`，支持 `--input`、`--run`、`--stack`、`--scope`、`--selinux`、`--out-dir`、`--stdout`、`--zip` 与 `--help`（指向 `https://quadletgen.com`），并通过 Vitest 10 项端到端 CLI 测试覆盖。
 - **全套发布工具包（`LAUNCH_KIT.md`）与 GitHub 准产 `README.md`**：包含 X 25 秒视频分镜与发帖话术、3 条布尔痛点搜索词与价值优先回复模板、Hacker News Show HN 事实备忘、Reddit（r/podman、r/selfhosted、r/linuxadmin）发帖模板、Console.dev 投稿草案及 upstream podlet#190 技术规避评论模版。
 - **隐私安全 GA4 漏斗埋点（`BaseLayout.astro`、`src/lib/analytics.ts`）**：基于 `window.dataLayer` 本地队列记录 `config` 与脱敏导出事件（`quadlet_export`），过滤 YAML/凭据参数；在 `127.0.0.1` / `localhost` 下零外网脚本请求。
-- **升级版构建后 SEO 门禁（`scripts/seo-preflight.mjs`）**：默认源站 `https://quadletgen.com`，校验全部 9 个内容路由与 11 个静态附属文件、`og-image.png`（>5KB 且校验 PNG 魔数）、`github-social-preview.png`、双重 IndexNow 密钥文件、`og:image` 指向 `/og-image.png`、`_headers` 中的 `noindex` 防护、唯一 `<title>` / `<meta name="description">`、`<link rel="canonical">`、JSON-LD（全部 9 页含 `Organization` + `BreadcrumbList`，6 个工具页含 `WebApplication` + `FAQPage`）、全站内链可达性，以及零残留占位符与零长破折号。
-- **Playwright 6 用例端到端套件（`tests/e2e/quadlet.spec.ts`）**：保留原有 4 条核心转换/下载/容错测试，新增用例 5（GA4 `window.dataLayer` `config` + `quadlet_export` 队列校验且 `127.0.0.1` 以外请求数为 `0`）与用例 6（`375x812` 移动视口 `scrollWidth <= 375` 零横向溢出 + 页脚跳转 `/privacy/` 与 `/about/` HTTP 200 及 `<h1>` 可见性校验）。
+- **升级版构建后 SEO 门禁（`scripts/seo-preflight.mjs`）**：默认源站 `https://quadletgen.com`，校验全部 14 个内容路由与 11 个静态附属文件、`og-image.png`（>5KB 且校验 PNG 魔数）、`github-social-preview.png`、双重 IndexNow 密钥文件、`og:image` 指向 `/og-image.png`、`_headers` 中的 `noindex` 防护、唯一 `<title>` / `<meta name="description">`、`<link rel="canonical">`、JSON-LD（全部 14 页含 `Organization` + `BreadcrumbList`，11 个工具页含 `WebApplication` + `FAQPage`）、全站内链可达性，以及零残留占位符与零长破折号。
+- **Playwright 7 用例端到端套件（`tests/e2e/quadlet.spec.ts`）**：保留原有 6 条，新增长尾五页可转换、`quadlet_export` 与 `375x812` 零横向溢出校验。
 - **上线执行手册（`LAUNCH_CHECKLIST.md`）**：涵盖 `quadletgen.com` 注册、Cloudflare Workers 部署、GA4 / GSC / Bing 接入、IndexNow 密钥替换与 9 路由推送，以及 Hetzner / DigitalOcean / Vultr 联盟账号申请与合规接入步骤。
 
 ## 等待站长完成的清单（`[人工]`）
@@ -44,7 +49,7 @@
 
 ## 下一步第一动作
 
-- `[人工]`：从 `LAUNCH_KIT.md` 发社区首发帖（Show HN、r/podman、X、Product Hunt），并开始 DigitalOcean / Vultr 联盟入驻。邮件路由、Bing Webmaster、共享统计登记与四条报表脚本均已在 2026-11-12 核验通过。
+- `[人工]`：从 `LAUNCH_KIT.md` 发社区首发帖（Show HN、r/podman、X、Product Hunt），并开始 DigitalOcean / Vultr 联盟入驻。邮件路由、Bing Webmaster、共享统计登记与四条报表脚本均已在 2026-11-12 核验通过。5 个新长尾 URL 已在仓库内，尚未部署，也未向 IndexNow、GSC 或 Bing 重新提交。
 
 ## 行动记录
 
@@ -54,3 +59,4 @@
 - `2026-11-12` `[AI]`：生产上线 `https://quadletgen.com`。GA4 Property `564011383`，Stream `16325768198`，Measurement ID `G-PK7MR29S6E`，Key Event `quadlet_export`。Site Verification DNS_TXT 与 GSC `sc-domain:quadletgen.com` 完成，sitemap PUT 204。IndexNow HTTP 202（9 URL）。构建时 `launch-preflight` 与 `seo:check` 均为 `ok: true`。Wrangler 部署 Version ID `5d9f6d3a-eb30-4899-b80c-e671203e5d13`。六种机器人 UA 对首页均为 HTTP 200，`www` 为 301。
 - `2026-11-12` `[AI]`：核验邮件路由、Bing Webmaster 与共享统计登记。Zone `8abf0febaad1c30746ddce02a50a660f` 为 `active`；Email Routing `enabled: true, status: ready`，`hello@` 与 `privacy@` 转发到 `liqi199315@gmail.com`，MX/SPF/DKIM 锁定且有 `_dmarc` TXT。`composetoquadlet` 已写入 `../../40_shared/analytics-sites.yaml`（`564011383` / `G-PK7MR29S6E` / `sc-domain:quadletgen.com` / `https://quadletgen.com/`）。Bing `IsVerified: true`（未代理 `verify.bing.com` CNAME），sitemap 经 `SubmitFeed` 提交。`ga4-report.mjs`、`gsc-report.mjs`、`bing-report.mjs`、`analytics-registry.test.mjs` 退出码均为 `0`。剩余 `[人工]`：`LAUNCH_KIT.md` 社区首发与 DigitalOcean / Vultr 入驻。
 - `2026-11-12` `[AI]`：上线后最佳实践巡检收口：`wrangler.jsonc` 关闭 `workers_dev` 与 `preview_urls` 并重部署（Version `33147d26-6f16-42e6-a72e-c90d3881c412`，真网验证 `compose-to-quadlet.liqi199315.workers.dev` 已返回 HTTP `404`）；清理 `public/_headers` 无效域名行并对齐 `seo-preflight.mjs` 门禁；通过 GA4 Admin API 注册 `action`、`template` 自定义维度与 `unit_count` 自定义指标；通过 `gh repo edit` 补齐 GitHub 仓库主页、简介与 10 个 Topics，并同步 `PLAN_90DAY.md` 状态。
+- `2026-11-13` `[AI]`：新增 5 个长尾工具页（`/quadlet-depends-on-healthcheck/`、`/quadlet-not-starting-on-boot/`、`/podman-pihole-quadlet/`、`/jellyfin-podman-quadlet/`、`/quadlet-vs-docker-compose/`），写入 sitemap 源与站内导航。转换器在 `depends_on.condition: service_healthy` 且依赖项有 healthcheck 时输出 `Notify=healthy`；Jellyfin 既有 docker run 模板补充 `--userns keep-id` 与 `--group-add keep-groups`。Podman 5.8.10 `quadlet -dryrun -user` 已核验生成单元。未部署，未向 IndexNow 重提 URL。容器未实际启动，主机未重启。

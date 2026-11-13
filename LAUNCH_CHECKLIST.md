@@ -14,9 +14,9 @@ PUBLIC_SITE_URL=https://quadletgen.com npm run verify:all
 
 Confirm all four gates pass:
 - [ ] `npm test` passes all Vitest parser, formatter, packager, and CLI specs.
-- [ ] `npm run build` outputs all 9 route HTML files plus `404.html`, `sitemap-index.xml`, `robots.txt`, `llms.txt`, `_headers`, `og-image.svg`, `og-image.png`, `github-social-preview.png`, `site.webmanifest`, `indexnow-key.txt`, and `c9d2e4f73a814b629d4c35e8f2a16c53.txt` into `dist/`.
-- [ ] `npm run seo:check` (`scripts/seo-preflight.mjs`) reports `ok: true`, `routesChecked: 9`, valid `og:image` ending in `/og-image.png` with PNG magic bytes (>5 KB), dual IndexNow key file, `X-Robots-Tag: noindex` in `_headers`, `Organization` + `BreadcrumbList` on all 9 routes, `WebApplication` + `FAQPage` on all 6 converter routes, resolved internal links, and zero placeholders or long-dashes.
-- [ ] `npm run test:e2e` passes all 6 Playwright Chromium journeys, including `window.dataLayer` (`config` + `quadlet_export`) with `0` external requests on `127.0.0.1` and `scrollWidth <= 375` on `375x812` mobile viewport.
+- [ ] `npm run build` outputs all 14 route HTML files plus `404.html`, `sitemap-index.xml`, `robots.txt`, `llms.txt`, `_headers`, `og-image.svg`, `og-image.png`, `github-social-preview.png`, `site.webmanifest`, `indexnow-key.txt`, and `c9d2e4f73a814b629d4c35e8f2a16c53.txt` into `dist/`.
+- [ ] `npm run seo:check` (`scripts/seo-preflight.mjs`) reports `ok: true`, `routesChecked: 14`, valid `og:image` ending in `/og-image.png` with PNG magic bytes (>5 KB), dual IndexNow key file, `X-Robots-Tag: noindex` in `_headers`, `Organization` + `BreadcrumbList` on all 14 routes, `WebApplication` + `FAQPage` on all 11 converter routes, resolved internal links, and zero placeholders or long-dashes.
+- [ ] `npm run test:e2e` passes all 7 Playwright Chromium journeys, including `window.dataLayer` (`config` + `quadlet_export`) with `0` external requests on `127.0.0.1`, the five long-tail guides, and `scrollWidth <= 375` on `375x812` mobile viewport.
 
 ---
 

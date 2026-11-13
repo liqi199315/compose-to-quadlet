@@ -14,18 +14,21 @@ Read these four files in order at the start of every session before changing cod
 - **Brand and canonical site URL.** `QuadletGen` at `https://quadletgen.com` (`PUBLIC_SITE_URL` override supported; contact `hello@quadletgen.com`).
 - **Workspace stage.** Formal independent product repository in `/Users/dake/Projects/aiapp/30_products/compose-to-quadlet/`.
 - **Tech stack.** Astro 5 (`output: 'static'`, `trailingSlash: 'always'`, `build.format: 'directory'`), Tailwind CSS v4, TypeScript (`astro/tsconfigs/strict`), Vitest, Playwright, and Cloudflare Workers Static Assets (`wrangler.jsonc`).
-- **Nine indexed content routes.**
-	- Six converter workbench routes (`WebApplication` + `FAQPage` + `Organization` + `BreadcrumbList` JSON-LD):
-		- `/` (`dist/index.html`)
-		- `/podman-quadlet-generator/` (`dist/podman-quadlet-generator/index.html`)
-		- `/docker-run-to-quadlet-converter/` (`dist/docker-run-to-quadlet-converter/index.html`)
-		- `/rootless-quadlet-selinux-volume-generator/` (`dist/rootless-quadlet-selinux-volume-generator/index.html`)
-		- `/immich-nextcloud-vaultwarden-quadlet-templates/` (`dist/immich-nextcloud-vaultwarden-quadlet-templates/index.html`)
-		- `/podlet-online-multi-container-network-packager/` (`dist/podlet-online-multi-container-network-packager/index.html`)
-	- Three E-E-A-T and compliance trust routes (`Organization` + `BreadcrumbList` JSON-LD):
-		- `/about/` (`dist/about/index.html`)
-		- `/privacy/` (`dist/privacy/index.html`)
-		- `/terms/` (`dist/terms/index.html`)
+- **Fourteen indexed content routes.** Eleven converter workbench routes (`WebApplication` + `FAQPage` + `Organization` + `BreadcrumbList` JSON-LD) and three E-E-A-T trust routes (`Organization` + `BreadcrumbList` JSON-LD):
+	- `/` (`dist/index.html`)
+	- `/podman-quadlet-generator/` (`dist/podman-quadlet-generator/index.html`)
+	- `/docker-run-to-quadlet-converter/` (`dist/docker-run-to-quadlet-converter/index.html`)
+	- `/rootless-quadlet-selinux-volume-generator/` (`dist/rootless-quadlet-selinux-volume-generator/index.html`)
+	- `/immich-nextcloud-vaultwarden-quadlet-templates/` (`dist/immich-nextcloud-vaultwarden-quadlet-templates/index.html`)
+	- `/podlet-online-multi-container-network-packager/` (`dist/podlet-online-multi-container-network-packager/index.html`)
+	- `/quadlet-depends-on-healthcheck/` (`dist/quadlet-depends-on-healthcheck/index.html`)
+	- `/quadlet-not-starting-on-boot/` (`dist/quadlet-not-starting-on-boot/index.html`)
+	- `/podman-pihole-quadlet/` (`dist/podman-pihole-quadlet/index.html`)
+	- `/jellyfin-podman-quadlet/` (`dist/jellyfin-podman-quadlet/index.html`)
+	- `/quadlet-vs-docker-compose/` (`dist/quadlet-vs-docker-compose/index.html`)
+	- `/about/` (`dist/about/index.html`)
+	- `/privacy/` (`dist/privacy/index.html`)
+	- `/terms/` (`dist/terms/index.html`)
 - **Eleven auxiliary static outputs.** `dist/404.html`, `dist/sitemap-index.xml`, `dist/robots.txt`, `dist/llms.txt`, `dist/_headers`, `dist/og-image.svg`, `dist/og-image.png`, `dist/github-social-preview.png`, `dist/site.webmanifest`, `dist/indexnow-key.txt`, and `dist/c9d2e4f73a814b629d4c35e8f2a16c53.txt`.
 - **Standalone Node ESM CLI.** `bin/compose-to-quadlet.mjs` (compiled from `src/cli.ts` via `npm run build:cli` with esbuild, supporting `--input`, `--run`, `--stack`, `--scope`, `--selinux`, `--out-dir`, `--stdout`, `--zip`, and `--help`).
 

@@ -74,6 +74,8 @@ volumes:
 		expect(dbFile!.content).toContain('HealthCmd=pg_isready -U postgres');
 		expect(dbFile!.content).toContain('HealthInterval=10s');
 		expect(dbFile!.content).toContain('HealthRetries=5');
+		expect(dbFile!.content).toContain('Notify=healthy');
+		expect(apiFile!.content).not.toContain('Notify=healthy');
 	});
 
 	it('emits shared .network unit and service network wiring for >=2 services (podlet#190 fix)', () => {
@@ -158,6 +160,70 @@ services:
 		expect(appUnit.content).toContain('Requires=cache.service');
 		expect(appUnit.content).toContain('After=search.service');
 		expect(appUnit.content).toContain('Requires=search.service');
+		expect(appUnit.content).not.toContain('Notify=healthy');
+	});
+
+	it('sets Notify=healthy only on dependencies waited on with service_healthy', () => {
+		const res = convertToQuadlet(SAMPLE_TEMPLATES['web-postgres-redis'].content, {
+			...DEFAULT_OPTIONS,
+			stackName: 'webapp',
+		});
+		expect(res.ok).toBe(true);
+		if (!res.ok) return;
+
+		const web = res.files.find((f) => f.filename === 'web.container')!;
+		const postgres = res.files.find((f) => f.filename === 'postgres.container')!;
+		const redis = res.files.find((f) => f.filename === 'redis.container')!;
+		expect(web.content).toContain('After=postgres.service');
+		expect(web.content).toContain('Requires=postgres.service');
+		expect(web.content).toContain('After=redis.service');
+		expect(postgres.content).toContain('Notify=healthy');
+		expect(postgres.content).toContain('HealthCmd=pg_isready -U appuser -d appdb');
+		expect(redis.content).toContain('HealthCmd=redis-cli ping');
+		expect(redis.content).not.toContain('Notify=healthy');
+	});
+
+	it('omits Notify=healthy and warns when service_healthy has no healthcheck', () => {
+		const yaml = `
+services:
+  api:
+    image: nginx:alpine
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    image: postgres:16
+`;
+		const res = convertToQuadlet(yaml, DEFAULT_OPTIONS);
+		expect(res.ok).toBe(true);
+		if (!res.ok) return;
+		const db = res.files.find((f) => f.filename === 'db.container')!;
+		expect(db.content).not.toContain('Notify=healthy');
+		expect(res.warnings.some((w) => w.field === 'healthcheck')).toBe(true);
+	});
+
+	it('maps required: false to Wants= and warns on service_completed_successfully', () => {
+		const yaml = `
+services:
+  app:
+    image: busybox:latest
+    depends_on:
+      init:
+        condition: service_completed_successfully
+        required: false
+  init:
+    image: busybox:latest
+    command: ["true"]
+`;
+		const res = convertToQuadlet(yaml, DEFAULT_OPTIONS);
+		expect(res.ok).toBe(true);
+		if (!res.ok) return;
+		const app = res.files.find((f) => f.filename === 'app.container')!;
+		expect(app.content).toContain('After=init.service');
+		expect(app.content).toContain('Wants=init.service');
+		expect(app.content).not.toContain('Requires=init.service');
+		expect(res.warnings.some((w) => w.message.includes('service_completed_successfully'))).toBe(true);
+		expect(res.warnings.some((w) => w.message.includes('required: false'))).toBe(true);
 	});
 
 	it('applies SELinux :z and :Z volume flags without duplicating existing labels', () => {
@@ -389,6 +455,74 @@ describe('convertToQuadlet docker run CLI conversion', () => {
 		).toBe(true);
 	});
 
+	it('maps the Jellyfin template device, userns, and group-add flags', () => {
+		const tpl = SAMPLE_TEMPLATES['docker-run-jellyfin'];
+		const res = convertToQuadlet(tpl.content, {
+			...DEFAULT_OPTIONS,
+			stackName: tpl.stackName,
+			selinuxMode: 'private-Z',
+		});
+		expect(res.ok).toBe(true);
+		if (!res.ok) return;
+		const unit = res.files.find((f) => f.filename === 'jellyfin.container')!;
+		expect(unit.content).toContain('AddDevice=/dev/dri:/dev/dri');
+		expect(unit.content).toContain('GroupAdd=keep-groups');
+		expect(unit.content).toContain('UserNS=keep-id');
+		expect(unit.content).toContain('User=1000:1000');
+		expect(unit.content).toContain('Volume=/srv/media:/media:ro,Z');
+		expect(unit.content).toContain('WantedBy=default.target');
+	});
+
+	it('publishes Pi-hole DNS on 53 and moves the web UI to 8080', () => {
+		const tpl = SAMPLE_TEMPLATES['pihole-rootless'];
+		const res = convertToQuadlet(tpl.content, {
+			...DEFAULT_OPTIONS,
+			stackName: tpl.stackName,
+			selinuxMode: 'private-Z',
+			extractSecretsToEnvFile: true,
+			enableAutoUpdate: true,
+		});
+		expect(res.ok).toBe(true);
+		if (!res.ok) return;
+		const unit = res.files.find((f) => f.filename === 'pihole.container')!;
+		expect(unit.content).toContain('PublishPort=53:53/tcp');
+		expect(unit.content).toContain('PublishPort=53:53/udp');
+		expect(unit.content).toContain('PublishPort=8080:80/tcp');
+		expect(unit.content).toContain('Environment=FTLCONF_dns_listeningMode=ALL');
+		expect(unit.content).toContain('Volume=/srv/pihole/etc-pihole:/etc/pihole:Z');
+		expect(unit.content).toContain('AutoUpdate=registry');
+		expect(unit.content).not.toContain('AddCapability=NET_ADMIN');
+		expect(unit.content).not.toContain('sample-pihole-web-password');
+		const env = res.files.find((f) => f.filename === 'pihole.env')!;
+		expect(env.content).toContain('FTLCONF_webserver_api_password=sample-pihole-web-password');
+	});
+
+	it('writes WantedBy=default.target for rootless boot units and multi-user.target for rootful', () => {
+		const tpl = SAMPLE_TEMPLATES['rootless-boot-nginx'];
+		const rootless = convertToQuadlet(tpl.content, {
+			...DEFAULT_OPTIONS,
+			stackName: tpl.stackName,
+			installScope: 'rootless',
+			generateSharedNetwork: false,
+		});
+		expect(rootless.ok).toBe(true);
+		if (!rootless.ok) return;
+		expect(rootless.files).toHaveLength(1);
+		expect(rootless.files[0]!.content).toContain('WantedBy=default.target');
+		expect(rootless.files[0]!.installPath).toContain('.config/containers/systemd');
+
+		const rootful = convertToQuadlet(tpl.content, {
+			...DEFAULT_OPTIONS,
+			stackName: tpl.stackName,
+			installScope: 'rootful',
+			generateSharedNetwork: false,
+		});
+		expect(rootful.ok).toBe(true);
+		if (!rootful.ok) return;
+		expect(rootful.files[0]!.content).toContain('WantedBy=multi-user.target');
+		expect(rootful.files[0]!.installPath).toContain('/etc/containers/systemd');
+	});
+
 	it('supports podman run with inline equals syntax (--publish=..., --network=...)', () => {
 		const cmd =
 			'podman run --rm --name=dns --network=dnsnet --publish=5353:53/udp coredns/coredns:1.11.3 -conf /Corefile';
@@ -452,14 +586,20 @@ describe('convertToQuadlet boundary error handling', () => {
 });
 
 describe('SAMPLE_TEMPLATES and buildZipArchive', () => {
-	it('converts all 5 sample templates cleanly and supports private-Z on the primary container unit', () => {
+	it('converts every sample template and applies private-Z only when a volume is present', () => {
 		const expectedIds: SampleTemplateId[] = [
 			'web-postgres-redis',
 			'immich-stack',
 			'vaultwarden-caddy',
 			'nextcloud-mariadb',
 			'docker-run-jellyfin',
+			'healthcheck-depends',
+			'rootless-boot-nginx',
+			'pihole-rootless',
+			'quadlet-vs-compose',
 		];
+
+		expect(Object.keys(SAMPLE_TEMPLATES).sort()).toEqual([...expectedIds].sort());
 
 		for (const id of expectedIds) {
 			const tpl = SAMPLE_TEMPLATES[id];
@@ -482,7 +622,13 @@ describe('SAMPLE_TEMPLATES and buildZipArchive', () => {
 			expect(res.inputMode).toBe(tpl.mode);
 			expect(res.files[0]!.unitType).toBe('container');
 			expect(res.files[0]!.content).toContain('[Container]');
-			expect(res.files[0]!.content).toContain(':Z');
+			expect(res.files[0]!.content).toContain('WantedBy=default.target');
+			const containerWithVolume = res.files.find(
+				(file) => file.unitType === 'container' && file.content.includes('Volume='),
+			);
+			if (containerWithVolume) {
+				expect(containerWithVolume.content).toContain(':Z');
+			}
 		}
 	});
 

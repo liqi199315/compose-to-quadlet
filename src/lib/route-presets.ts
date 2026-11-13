@@ -1,4 +1,5 @@
 import type { QuadletRoutePreset } from './types';
+import { LONGTAIL_PRESETS } from './longtail-presets';
 
 export const ROUTE_PRESETS: QuadletRoutePreset[] = [
 	{
@@ -24,7 +25,7 @@ export const ROUTE_PRESETS: QuadletRoutePreset[] = [
 		},
 		technicalNotes: [
 			'Podman 4.4 and newer include podman-system-generator, which compiles declarative .container, .network, and .volume files into transient systemd services during daemon-reload.',
-			'Compose depends_on entries translate to systemd [Unit] After= and Requires= directives so PostgreSQL, MariaDB, and Redis containers start before application workers.',
+			'Compose depends_on entries translate to systemd [Unit] After= and Requires= directives. condition: service_healthy also writes Notify=healthy on the dependency when that service has a healthcheck, which requires Podman 5.0 or newer.',
 			'Rootless units live in ~/.config/containers/systemd/ and run under your unprivileged user session via systemctl --user without a root daemon.',
 			'Named volumes from top-level Compose volumes blocks become dedicated .volume Quadlet files referenced by unit name in Volume= directives.',
 		],
@@ -301,6 +302,7 @@ export const ROUTE_PRESETS: QuadletRoutePreset[] = [
 			},
 		],
 	},
+	...LONGTAIL_PRESETS,
 ];
 
 export interface QuadletCheatSheetRow {
@@ -336,10 +338,10 @@ export const QUADLET_CHEAT_SHEET: readonly QuadletCheatSheetRow[] = [
 		runtimeNote: 'Sensitive password, token, and key entries extract into <stack>.env with chmod 600.',
 	},
 	{
-		composeKey: 'depends_on',
-		quadletSection: '[Unit]',
-		quadletDirective: 'After=<dep>.service + Requires=',
-		runtimeNote: 'Starts PostgreSQL, MariaDB, and Redis units before dependent web or worker units.',
+		composeKey: 'depends_on / service_healthy',
+		quadletSection: '[Unit] + [Container]',
+		quadletDirective: 'After= + Requires= + Notify=healthy',
+		runtimeNote: 'service_started is ordering only. service_healthy also sets Notify=healthy on the dependency when it has a healthcheck (Podman 5.0+).',
 	},
 	{
 		composeKey: 'networks (or stack default)',
@@ -357,7 +359,7 @@ export const QUADLET_CHEAT_SHEET: readonly QuadletCheatSheetRow[] = [
 		composeKey: 'healthcheck.test / interval',
 		quadletSection: '[Container]',
 		quadletDirective: 'HealthCmd= / HealthInterval=',
-		runtimeNote: 'Translates CMD and CMD-SHELL probes along with retries, timeout, and start_period.',
+		runtimeNote: 'CMD and CMD-SHELL become HealthCmd=. Pair with Notify=healthy when another service waits for service_healthy.',
 	},
 	{
 		composeKey: 'devices / cap_add / user',
@@ -388,6 +390,11 @@ const PRESET_BADGE_MAP: Record<string, string> = {
 	'rootless-quadlet-selinux-volume-generator': 'SELinux :z / :Z Mounts',
 	'immich-nextcloud-vaultwarden-quadlet-templates': 'Self-Hosted Stacks',
 	'podlet-online-multi-container-network-packager': 'Multi-Unit ZIP Bundle',
+	'quadlet-depends-on-healthcheck': 'service_healthy Mapping',
+	'quadlet-not-starting-on-boot': 'Linger and Boot',
+	'podman-pihole-quadlet': 'Rootless DNS',
+	'jellyfin-podman-quadlet': 'Jellyfin /dev/dri',
+	'quadlet-vs-docker-compose': 'Compose Comparison',
 };
 
 export function getRelatedGuideCards(currentPath: string): RelatedGuideCard[] {
