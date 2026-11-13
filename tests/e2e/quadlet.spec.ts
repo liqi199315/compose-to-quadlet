@@ -207,4 +207,64 @@ test.describe('Compose to Quadlet converter journeys', () => {
 		const aboutScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
 		expect(aboutScrollWidth).toBeLessThanOrEqual(375);
 	});
+
+	test('long-tail guides render a working converter and can export', async ({ page }) => {
+		const routes: { path: string; output: string }[] = [
+			{ path: '/quadlet-depends-on-healthcheck/', output: 'Notify=healthy' },
+			{ path: '/quadlet-not-starting-on-boot/', output: 'WantedBy=default.target' },
+			{ path: '/podman-pihole-quadlet/', output: 'PublishPort=53:53/udp' },
+			{ path: '/jellyfin-podman-quadlet/', output: 'AddDevice=/dev/dri:/dev/dri' },
+			{ path: '/quadlet-vs-docker-compose/', output: 'Network=edge.network' },
+		];
+
+		for (const route of routes) {
+			const response = await page.goto(route.path);
+			expect(response?.status()).toBe(200);
+			await expect(page.locator('h1')).toBeVisible();
+			await expect(page.getByText('quadletgen.com').first()).toBeVisible();
+			await expect(page.getByTestId('status-banner')).toHaveAttribute('data-status', 'ok');
+			await expect.poll(() => readOutputText(page.getByTestId('unit-output'))).toContain(route.output);
+		}
+
+		await page.goto('/quadlet-depends-on-healthcheck/');
+		await expect(page.getByTestId('status-banner')).toHaveAttribute('data-status', 'ok');
+		const downloadPromise = page.waitForEvent('download');
+		await page.getByTestId('download-zip-btn').click();
+		await downloadPromise;
+		const dataLayerEntries = await page.evaluate(() => {
+			const raw = (window as Window & { dataLayer?: unknown[] }).dataLayer ?? [];
+			return raw.map((entry) => {
+				if (Array.isArray(entry)) {
+					return entry;
+				}
+				if (entry && typeof entry === 'object' && 'length' in entry) {
+					return Array.from(entry as ArrayLike<unknown>);
+				}
+				return entry;
+			});
+		});
+		const hasQuadletExport = dataLayerEntries.some((entry) => {
+			if (Array.isArray(entry)) {
+				return entry[0] === 'event' && entry[1] === 'quadlet_export';
+			}
+			return Boolean(
+				entry &&
+					typeof entry === 'object' &&
+					(entry as Record<string, unknown>).event === 'quadlet_export',
+			);
+		});
+		expect(hasQuadletExport).toBe(true);
+
+		const healthLink = page.locator('main a[href="/quadlet-depends-on-healthcheck/"]');
+		await page.goto('/quadlet-vs-docker-compose/');
+		await expect(healthLink.first()).toBeVisible();
+
+		await page.setViewportSize({ width: 375, height: 812 });
+		for (const route of routes) {
+			await page.goto(route.path);
+			await expect(page.getByTestId('status-banner')).toHaveAttribute('data-status', 'ok');
+			const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+			expect(scrollWidth).toBeLessThanOrEqual(375);
+		}
+	});
 });

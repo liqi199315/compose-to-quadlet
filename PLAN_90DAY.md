@@ -154,6 +154,7 @@
 | P1-1 | 上线第 14 天拉取 GSC 与 Bing 收录状态，核查全部 9 个路由（6 个核心转换器路由 + `/about/`、`/privacy/`、`/terms/`）是否全部入库（依赖 P0-4） | `[AI]` | `待办` |
 | P1-2 | 基于前 28 天真实搜索词报告，识别高曝光低点击查询词，针对性补充对应 Podman 4.4+/5.x 选项（如 `--cap-add`、`--security-opt`、Quadlet `AutoUpdate=registry`、`.pod` 单元对照）排查 FAQ 与命令对照表（每次改动 <= 2 页，遵守 28 天标题冻结期；依赖 P1-1） | `[AI]` | `待办` |
 | P1-3 | 根据 GSC 真实浮现的自托管应用 Quadlet 查询（仅限有真实曝光证据的场景，如 Jellyfin、Home Assistant、Traefik 等），新增 1 至 2 个高意图模板子路由并通过 `verify:all`（依赖 P1-1） | `[协作]` | `待办` |
+| P1-5 | 按站长明确要求新增 5 个长尾工具页（healthcheck depends、boot linger、Pi-hole、Jellyfin、Quadlet vs Compose），并在转换器中为 `condition: service_healthy` 写出 `Notify=healthy`。此条不是 P1-3 的 GSC 证据触发，不改主增长假设 | `[AI]` | `已完成（2026-11-13）` |
 | P1-D1 | 若站长选择启用技术社区发布：AI 起草面向 Podman / Fedora / 自托管开发者的纯技术帖草稿（聚焦浏览器本地零上传、自动共享 `.network` 解决 `podlet#190` 跨容器 DNS、SELinux `:Z` 推导），站长用自有账号实名发布并回复评论，7 日后 AI 汇总引流与 `quadlet_export` 导出数据 | `[协作]` | `待办` |
 
 **Phase 1 验收（第 6 周末：2026-12-23）**：

@@ -42,6 +42,36 @@ export const CONTENT_ROUTES = [
 		isToolRoute: true,
 	},
 	{
+		route: '/quadlet-depends-on-healthcheck/',
+		file: 'quadlet-depends-on-healthcheck/index.html',
+		canonical: `${SITE_ORIGIN}/quadlet-depends-on-healthcheck/`,
+		isToolRoute: true,
+	},
+	{
+		route: '/quadlet-not-starting-on-boot/',
+		file: 'quadlet-not-starting-on-boot/index.html',
+		canonical: `${SITE_ORIGIN}/quadlet-not-starting-on-boot/`,
+		isToolRoute: true,
+	},
+	{
+		route: '/podman-pihole-quadlet/',
+		file: 'podman-pihole-quadlet/index.html',
+		canonical: `${SITE_ORIGIN}/podman-pihole-quadlet/`,
+		isToolRoute: true,
+	},
+	{
+		route: '/jellyfin-podman-quadlet/',
+		file: 'jellyfin-podman-quadlet/index.html',
+		canonical: `${SITE_ORIGIN}/jellyfin-podman-quadlet/`,
+		isToolRoute: true,
+	},
+	{
+		route: '/quadlet-vs-docker-compose/',
+		file: 'quadlet-vs-docker-compose/index.html',
+		canonical: `${SITE_ORIGIN}/quadlet-vs-docker-compose/`,
+		isToolRoute: true,
+	},
+	{
 		route: '/about/',
 		file: 'about/index.html',
 		canonical: `${SITE_ORIGIN}/about/`,

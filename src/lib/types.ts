@@ -45,7 +45,33 @@ export type SampleTemplateId =
 	| 'immich-stack'
 	| 'vaultwarden-caddy'
 	| 'nextcloud-mariadb'
-	| 'docker-run-jellyfin';
+	| 'docker-run-jellyfin'
+	| 'healthcheck-depends'
+	| 'rootless-boot-nginx'
+	| 'pihole-rootless'
+	| 'quadlet-vs-compose';
+
+export interface GuideCodeBlock {
+	title: string;
+	code: string;
+}
+
+export interface GuideSection {
+	id: string;
+	eyebrow: string;
+	heading: string;
+	paragraphs: string[];
+	bullets?: string[];
+	codes?: GuideCodeBlock[];
+	links?: { href: string; label: string; external?: boolean }[];
+}
+
+export interface SpotlightLink {
+	href: string;
+	eyebrow: string;
+	title: string;
+	summary: string;
+}
 
 export interface RouteFaqItem {
 	question: string;
@@ -66,4 +92,9 @@ export interface QuadletRoutePreset {
 	defaultOptions: QuadletConvertOptions;
 	technicalNotes: string[];
 	faqs: RouteFaqItem[];
+	provenanceNote?: string;
+	guideSections?: GuideSection[];
+	spotlightLinks?: SpotlightLink[];
+	showGeneratedExample?: boolean;
+	exampleLayout?: 'stacked' | 'split';
 }

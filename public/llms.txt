@@ -21,6 +21,11 @@ QuadletGen (`https://quadletgen.com`) converts `compose.yaml` service stacks and
 - [Rootless Quadlet SELinux Volume Generator](https://quadletgen.com/rootless-quadlet-selinux-volume-generator/): Configure rootless Podman bind mounts with `:z` and `:Z` SELinux labels plus `.env` secret files.
 - [Immich, Nextcloud, and Vaultwarden Quadlet Templates](https://quadletgen.com/immich-nextcloud-vaultwarden-quadlet-templates/): Load ready-to-customize self-hosted Compose stacks and export linked Quadlet units.
 - [Podlet Online Multi-Container Network Packager](https://quadletgen.com/podlet-online-multi-container-network-packager/): Package multi-service Compose stacks with shared `.network` units and `.zip` export in the browser.
+- [Quadlet depends_on healthcheck](https://quadletgen.com/quadlet-depends-on-healthcheck/): Map `condition: service_healthy` to `After=`, `Requires=`, and `Notify=healthy`.
+- [Quadlet not starting on boot](https://quadletgen.com/quadlet-not-starting-on-boot/): Rootless `WantedBy=default.target` and `loginctl enable-linger` checklist.
+- [Podman Pi-hole Quadlet](https://quadletgen.com/podman-pihole-quadlet/): Rootless Pi-hole DNS on port 53 with `ip_unprivileged_port_start` and listening mode `ALL`.
+- [Jellyfin Podman Quadlet](https://quadletgen.com/jellyfin-podman-quadlet/): Jellyfin docker run template with `/dev/dri`, `GroupAdd=keep-groups`, and SELinux notes.
+- [Quadlet vs Docker Compose](https://quadletgen.com/quadlet-vs-docker-compose/): Side-by-side conversion of one Caddy and whoami stack, with links to the other guides.
 
 ## Project and Policies
 
