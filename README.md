@@ -102,9 +102,9 @@ For the visual interactive workbench with live side-by-side editing, visit **htt
 
 ---
 
-## Hosted Web Workbench (9 Routes)
+## Hosted Web Workbench (14 Routes)
 
-QuadletGen publishes 9 indexed static routes with full E-E-A-T and JSON-LD metadata:
+QuadletGen publishes 14 indexed static routes with full E-E-A-T and JSON-LD metadata:
 
 | Route | Purpose |
 |---|---|
@@ -114,6 +114,11 @@ QuadletGen publishes 9 indexed static routes with full E-E-A-T and JSON-LD metad
 | `/rootless-quadlet-selinux-volume-generator/` | Rootless Quadlet builder with SELinux volume relabeling |
 | `/immich-nextcloud-vaultwarden-quadlet-templates/` | Pre-configured Quadlet stacks for Immich, Nextcloud, and Vaultwarden |
 | `/podlet-online-multi-container-network-packager/` | Multi-container network synthesizer and ZIP packager |
+| `/quadlet-depends-on-healthcheck/` | `depends_on` `service_healthy` to Quadlet `Notify=healthy` |
+| `/quadlet-not-starting-on-boot/` | Rootless `WantedBy=default.target` and systemd linger |
+| `/podman-pihole-quadlet/` | Rootless Pi-hole Quadlet on port 53 |
+| `/jellyfin-podman-quadlet/` | Jellyfin Quadlet from an existing docker run template, including `/dev/dri` |
+| `/quadlet-vs-docker-compose/` | Same-stack Quadlet and Docker Compose comparison, linked to the four guides above |
 | `/about/` | Engineering methodology, Podman 4.4+/5.x specs, and `hello@quadletgen.com` |
 | `/privacy/` | Zero-upload privacy guarantee and data handling policy |
 | `/terms/` | MIT license terms, staging verification duties, and affiliate disclosures |

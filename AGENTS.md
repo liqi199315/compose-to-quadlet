@@ -29,7 +29,7 @@ Read these four files in order at the start of every session before changing cod
 	- `/about/` (`dist/about/index.html`)
 	- `/privacy/` (`dist/privacy/index.html`)
 	- `/terms/` (`dist/terms/index.html`)
-- **Eleven auxiliary static outputs.** `dist/404.html`, `dist/sitemap-index.xml`, `dist/robots.txt`, `dist/llms.txt`, `dist/_headers`, `dist/og-image.svg`, `dist/og-image.png`, `dist/github-social-preview.png`, `dist/site.webmanifest`, `dist/indexnow-key.txt`, and `dist/c9d2e4f73a814b629d4c35e8f2a16c53.txt`.
+- **Twelve auxiliary static outputs.** `dist/404.html`, `dist/sitemap-index.xml`, `dist/robots.txt`, `dist/llms.txt`, `dist/_headers`, `dist/og-image.svg`, `dist/og-image.png`, `dist/github-social-preview.png`, `dist/site.webmanifest`, `dist/indexnow-key.txt`, `dist/c9d2e4f73a814b629d4c35e8f2a16c53.txt`, and `dist/release.json` (written after `astro build`; `project`, `siteUrl`, `routeCount`, and `routes` must match `sitemap-0.xml`).
 - **Standalone Node ESM CLI.** `bin/compose-to-quadlet.mjs` (compiled from `src/cli.ts` via `npm run build:cli` with esbuild, supporting `--input`, `--run`, `--stack`, `--scope`, `--selinux`, `--out-dir`, `--stdout`, `--zip`, and `--help`).
 
 ## Non-negotiable red lines
