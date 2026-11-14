@@ -1,0 +1,11 @@
+services:
+  app:
+    image: example/app:1.0
+    depends_on:
+      - cache
+      - 42
+  report:
+    image: example/report:1.0
+    depends_on: cache
+  cache:
+    image: example/cache:1.0

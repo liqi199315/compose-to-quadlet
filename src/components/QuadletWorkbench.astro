@@ -1,6 +1,7 @@
 ---
 import { convertToQuadlet } from '../lib/quadlet-engine';
 import { SAMPLE_TEMPLATES } from '../lib/sample-templates';
+import { dependencySkips } from '../lib/zip-packager';
 import type {
 	GeneratedUnitFile,
 	InstallScope,
@@ -134,6 +135,7 @@ const initialSummaryBadges = buildSummaryBadges(initialResult, preset.defaultOpt
 const initialOutputText = initialResult.ok ? formatCombinedOutput(initialResult.files) : '';
 const initialCommandsText = initialResult.ok ? initialResult.systemdCommands.join('\n') : '';
 const initialWarnings = initialResult.ok ? initialResult.warnings : [];
+const initialSkips = dependencySkips(initialWarnings);
 const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.defaultInputMode;
 ---
 
@@ -417,6 +419,33 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 			}
 		</ul>
 
+		<div
+			data-dependency-skips
+			class={`mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-100 ${
+				initialSkips.length === 0 ? 'hidden' : ''
+			}`}
+		>
+			<p class="font-semibold">Depends_on conditions without a full mapping</p>
+			<p class="mt-1 text-amber-200">
+				After= and Requires= order startup only. Skipped or degraded entries keep no health or completion
+				guarantee. The same list is written to README.txt inside the downloaded ZIP.
+			</p>
+			<ul data-testid="dependency-skip-list" class="mt-2 space-y-1.5">
+				{
+					initialSkips.map((warning) => (
+						<li
+							class="break-words [overflow-wrap:anywhere]"
+							data-warning-code={warning.code}
+							data-impact={warning.impact}
+						>
+							{warning.service ? `[${warning.service}] ` : ''}
+							{warning.field}: {warning.message}
+						</li>
+					))
+				}
+			</ul>
+		</div>
+
 		<div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-12">
 			<div
 				data-input-drop-target
@@ -539,13 +568,14 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 	import { convertToQuadlet } from '../lib/quadlet-engine';
 	import { SAMPLE_TEMPLATES } from '../lib/sample-templates';
 	import type {
+		ConversionWarning,
 		GeneratedUnitFile,
 		InstallScope,
 		QuadletConversionResult,
 		SampleTemplateId,
 		SelinuxMode,
 	} from '../lib/types';
-	import { buildZipArchive } from '../lib/zip-packager';
+	import { buildExportEntries, buildZipArchive, dependencySkips } from '../lib/zip-packager';
 
 	interface SummaryBadge {
 		key: string;
@@ -658,6 +688,10 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 		const statusBanner = root.querySelector<HTMLElement>('[data-testid="status-banner"]');
 		const unitSummaryPills = root.querySelector<HTMLElement>('[data-testid="unit-summary-pills"]');
 		const warningsList = root.querySelector<HTMLUListElement>('[data-warnings-list]');
+		const dependencySkipsSection = root.querySelector<HTMLElement>('[data-dependency-skips]');
+		const dependencySkipList = root.querySelector<HTMLUListElement>(
+			'[data-testid="dependency-skip-list"]',
+		);
 		const unitFileTabs = root.querySelector<HTMLElement>('[data-testid="unit-file-tabs"]');
 		const unitOutput = root.querySelector<HTMLTextAreaElement>('[data-testid="unit-output"]');
 		const systemdCommandsBox = root.querySelector<HTMLElement>('[data-testid="systemd-commands-box"]');
@@ -679,6 +713,8 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 			!statusBanner ||
 			!unitSummaryPills ||
 			!warningsList ||
+			!dependencySkipsSection ||
+			!dependencySkipList ||
 			!unitFileTabs ||
 			!unitOutput ||
 			!systemdCommandsBox ||
@@ -718,6 +754,43 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 				span.className = `inline-flex max-w-full items-center rounded-md border px-2.5 py-1 font-mono text-xs break-all sm:break-normal ${TONE_CLASSES[badge.tone]}`;
 				span.textContent = badge.label;
 				unitSummaryPills.appendChild(span);
+			}
+		};
+
+		const renderWarnings = (warnings: ConversionWarning[]): void => {
+			const skips = dependencySkips(warnings);
+			warningsList.replaceChildren();
+			if (warnings.length > 0) {
+				warningsList.classList.remove('hidden');
+				for (const warning of warnings) {
+					const item = document.createElement('li');
+					item.className = 'break-words [overflow-wrap:anywhere]';
+					const prefix = warning.service ? `[${warning.service}] ` : '';
+					item.textContent = `${prefix}${warning.field}: ${warning.message}`;
+					warningsList.appendChild(item);
+				}
+			} else {
+				warningsList.classList.add('hidden');
+			}
+
+			dependencySkipList.replaceChildren();
+			if (skips.length > 0) {
+				dependencySkipsSection.classList.remove('hidden');
+				for (const warning of skips) {
+					const item = document.createElement('li');
+					item.className = 'break-words [overflow-wrap:anywhere]';
+					if (warning.code) {
+						item.setAttribute('data-warning-code', warning.code);
+					}
+					if (warning.impact) {
+						item.setAttribute('data-impact', warning.impact);
+					}
+					const prefix = warning.service ? `[${warning.service}] ` : '';
+					item.textContent = `${prefix}${warning.field}: ${warning.message}`;
+					dependencySkipList.appendChild(item);
+				}
+			} else {
+				dependencySkipsSection.classList.add('hidden');
 			}
 		};
 
@@ -797,19 +870,7 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 					detectedModeBadge.textContent = `Mode: ${result.inputMode}`;
 				}
 
-				warningsList.replaceChildren();
-				if (result.warnings.length > 0) {
-					warningsList.classList.remove('hidden');
-					for (const warning of result.warnings) {
-						const item = document.createElement('li');
-						item.className = 'break-words';
-						const prefix = warning.service ? `[${warning.service}] ` : '';
-						item.textContent = `${prefix}${warning.field}: ${warning.message}`;
-						warningsList.appendChild(item);
-					}
-				} else {
-					warningsList.classList.add('hidden');
-				}
+				renderWarnings(result.warnings);
 
 				renderTabsAndOutput(result.files);
 				systemdCommandsBox.textContent = result.systemdCommands.join('\n');
@@ -826,8 +887,7 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 				if (detectedModeBadge) {
 					detectedModeBadge.textContent = 'Mode: syntax check';
 				}
-				warningsList.replaceChildren();
-				warningsList.classList.add('hidden');
+				renderWarnings([]);
 				unitFileTabs.replaceChildren();
 				unitOutput.value = '';
 				systemdCommandsBox.textContent = '';
@@ -1041,7 +1101,10 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 			if (!currentResult || !currentResult.ok || currentResult.files.length === 0) {
 				return;
 			}
-			const zipBytes = buildZipArchive(currentResult.files);
+			const stackLabel = stackNameInput.value.trim() || 'webapp';
+			const zipBytes = buildZipArchive(
+				buildExportEntries(currentResult.files, stackLabel, currentResult.warnings),
+			);
 			const blob = new Blob([zipBytes], { type: 'application/zip' });
 			const zipPrefix = sanitizeZipPrefix(stackNameInput.value);
 			const downloadUrl = URL.createObjectURL(blob);

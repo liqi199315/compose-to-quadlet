@@ -1,0 +1,54 @@
+services:
+  edge:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+  api:
+    image: ghcr.io/example/api:2.3.1
+    environment:
+      DATABASE_URL: postgresql://example:example@db:5432/example
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+      indexer:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      missing:
+        condition: service_healthy
+  worker:
+    image: ghcr.io/example/worker:2.3.1
+    depends_on:
+      db:
+        condition: service_started
+      cache:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+        required: false
+      gate:
+        condition: service_unhealthy
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: example-not-a-secret
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U example"]
+      interval: 10s
+      retries: 5
+  cache:
+    image: redis:7-alpine
+  indexer:
+    image: opensearchproject/opensearch:2.15.0
+    healthcheck:
+      test: ["NONE"]
+  migrate:
+    image: ghcr.io/example/api:2.3.1
+    command: ["sh", "-c", "echo migration-complete"]
+  gate:
+    image: busybox:1.36
+    command: ["true"]

@@ -7,7 +7,7 @@ import type {
 	QuadletConvertOptions,
 	SelinuxMode,
 } from './lib/types';
-import { buildZipArchive } from './lib/zip-packager';
+import { buildExportEntries, buildZipArchive } from './lib/zip-packager';
 
 const VERSION = '0.1.0';
 
@@ -297,7 +297,9 @@ export async function runCli(argv: string[]): Promise<number> {
 		try {
 			const zipParent = path.dirname(resolvedZipPath);
 			mkdirSync(zipParent, { recursive: true });
-			const zipBytes = buildZipArchive(result.files);
+			const zipBytes = buildZipArchive(
+				buildExportEntries(result.files, stackName, result.warnings),
+			);
 			writeFileSync(resolvedZipPath, zipBytes);
 			console.error(
 				`Successfully exported ${result.files.length} Quadlet file(s) to ${resolvedZipPath}`,

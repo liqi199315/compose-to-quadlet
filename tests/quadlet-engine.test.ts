@@ -199,7 +199,14 @@ services:
 		if (!res.ok) return;
 		const db = res.files.find((f) => f.filename === 'db.container')!;
 		expect(db.content).not.toContain('Notify=healthy');
-		expect(res.warnings.some((w) => w.field === 'healthcheck')).toBe(true);
+		const warning = res.warnings.find(
+			(w) => w.service === 'api' && w.field === 'depends_on.db.condition',
+		);
+		expect(warning).toBeDefined();
+		expect(warning?.code).toBe('depends_on.service_healthy.missing_healthcheck');
+		expect(warning?.impact).toBe('skipped');
+		expect(warning?.message).toContain('db');
+		expect(warning?.message).toContain('no usable healthcheck.test');
 	});
 
 	it('maps required: false to Wants= and warns on service_completed_successfully', () => {

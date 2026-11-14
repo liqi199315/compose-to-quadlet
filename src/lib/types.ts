@@ -24,6 +24,8 @@ export interface ConversionWarning {
 	service?: string;
 	field: string;
 	message: string;
+	code?: string;
+	impact?: 'skipped' | 'degraded';
 }
 
 export type QuadletConversionResult =

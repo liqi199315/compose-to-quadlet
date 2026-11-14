@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, type Locator, test } from '@playwright/test';
 
 async function readOutputText(locator: Locator): Promise<string> {
@@ -266,5 +267,63 @@ test.describe('Compose to Quadlet converter journeys', () => {
 			const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
 			expect(scrollWidth).toBeLessThanOrEqual(375);
 		}
+	});
+
+	test('lists unmapped depends_on conditions in the page and inside the downloaded ZIP', async ({
+		page,
+	}) => {
+		const fixture = readFileSync(
+			new URL('../fixtures/depends-on-conditions.yaml', import.meta.url),
+			'utf8',
+		);
+		const externalRequests: string[] = [];
+		page.on('request', (request) => {
+			const url = request.url();
+			if (!isLocalRequest(url)) {
+				externalRequests.push(url);
+			}
+		});
+
+		await page.goto('/');
+		const composeInput = page.getByTestId('compose-input');
+		await composeInput.fill(fixture);
+		await expect(page.getByTestId('status-banner')).toHaveAttribute('data-status', 'ok');
+		await expect.poll(() => readOutputText(page.getByTestId('unit-output'))).toContain('Notify=healthy');
+
+		const skipList = page.getByTestId('dependency-skip-list');
+		await expect(skipList).toBeVisible();
+		const skipText = (await skipList.textContent()) ?? '';
+		expect(skipText).toContain('depends_on.cache.condition');
+		expect(skipText).toContain('depends_on.migrate.condition');
+		expect(skipText).toContain('depends_on.gate.condition');
+		expect(skipText).toContain('service_completed_successfully');
+		expect(skipText).toContain('service_unhealthy');
+		await expect(
+			skipList.locator('[data-warning-code="depends_on.service_healthy.missing_healthcheck"]').first(),
+		).toBeVisible();
+		await expect(
+			skipList.locator('[data-warning-code="depends_on.service_completed_successfully.unsupported"]').first(),
+		).toBeVisible();
+
+		await page.setViewportSize({ width: 375, height: 812 });
+		const mobileScrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+		expect(mobileScrollWidth).toBeLessThanOrEqual(375);
+
+		const downloadPromise = page.waitForEvent('download');
+		await page.getByTestId('download-zip-btn').click();
+		const download = await downloadPromise;
+		const downloadPath = await download.path();
+		expect(downloadPath).toBeTruthy();
+		const zipText = readFileSync(downloadPath as string, 'utf8');
+
+		expect(zipText).toContain('README.txt');
+		expect(zipText).toContain('Skipped or degraded depends_on semantics');
+		expect(zipText).toContain('[api] depends_on.cache.condition');
+		expect(zipText).toContain('[api] depends_on.migrate.condition');
+		expect(zipText).toContain('[worker] depends_on.gate.condition');
+		expect(zipText).toContain('impact: skipped');
+		expect(zipText).toContain('order startup only');
+		expect(zipText).toContain('Notify=healthy');
+		expect(externalRequests).toEqual([]);
 	});
 });

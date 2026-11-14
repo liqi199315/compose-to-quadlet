@@ -145,6 +145,31 @@ describe('Standalone CLI (bin/compose-to-quadlet.mjs)', () => {
 		expect(zipBuffer[3]).toBe(0x04);
 	});
 
+	it('includes the dependency skip README in --zip when a condition cannot map', () => {
+		const composePath = path.join(tempDir, 'depends.yaml');
+		const composeYaml = `services:
+  app:
+    image: nginx:1.27-alpine
+    depends_on:
+      init:
+        condition: service_completed_successfully
+  init:
+    image: busybox:1.36
+    command: ["true"]
+`;
+		writeFileSync(composePath, composeYaml, 'utf8');
+
+		const zipPath = path.join(tempDir, 'depends.zip');
+		const res = runCli(['--input', composePath, '--stack', 'depstack', '--zip', zipPath]);
+
+		expect(res.status).toBe(0);
+		const zipText = readFileSync(zipPath, 'utf8');
+		expect(zipText).toContain('README.txt');
+		expect(zipText).toContain('Skipped or degraded depends_on semantics');
+		expect(zipText).toContain('depends_on.init.condition');
+		expect(zipText).toContain('service_completed_successfully');
+	});
+
 	it('fails gracefully on missing input file', () => {
 		const res = runCli(['--input', path.join(tempDir, 'nonexistent.yml')]);
 		expect(res.status).toBe(1);

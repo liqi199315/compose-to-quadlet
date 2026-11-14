@@ -8032,24 +8032,8 @@ function normalizeComposeService(serviceKey, rawSvc, stackName, stack) {
       stack.hasExplicitNetworks = true;
     }
   }
-  if (Array.isArray(rawSvc.depends_on)) {
-    for (const dep of rawSvc.depends_on) {
-      if (typeof dep === "string" && dep.trim()) {
-        service.dependsOn.push({
-          name: dep.trim(),
-          condition: "service_started",
-          required: true
-        });
-      }
-    }
-  } else if (isRecord(rawSvc.depends_on)) {
-    for (const [depName, depSpec] of Object.entries(rawSvc.depends_on)) {
-      const name = depName.trim();
-      if (!name) {
-        continue;
-      }
-      service.dependsOn.push(readDependsSpec(depSpec, serviceKey, name, stack));
-    }
+  if (rawSvc.depends_on !== void 0) {
+    service.dependsOn.push(...normalizeComposeDependsOn(rawSvc.depends_on, serviceKey, stack.warnings));
   }
   if (typeof rawSvc.restart === "string") {
     service.restart = rawSvc.restart.trim();
@@ -8182,24 +8166,72 @@ function collectUnsupportedServiceWarnings(serviceKey, rawSvc, warnings) {
     });
   }
 }
-function readDependsSpec(raw, serviceKey, depName, stack) {
+function normalizeComposeDependsOn(rawDependsOn, serviceKey, warnings) {
+  const dependencies = [];
+  if (Array.isArray(rawDependsOn)) {
+    rawDependsOn.forEach((entry, index) => {
+      if (typeof entry === "string" && entry.trim()) {
+        dependencies.push({ name: entry.trim(), condition: "service_started", required: true });
+        return;
+      }
+      warnings.push({
+        service: serviceKey,
+        field: `depends_on[${index}]`,
+        code: "depends_on.entry.invalid",
+        impact: "skipped",
+        message: `depends_on entry ${index} is not a service name. It was dropped, so no After= or Requires= line is written for it.`
+      });
+    });
+    return dependencies;
+  }
+  if (isRecord(rawDependsOn)) {
+    for (const [depName, depSpec] of Object.entries(rawDependsOn)) {
+      const name = depName.trim();
+      if (!name) {
+        continue;
+      }
+      dependencies.push(readDependsSpec(depSpec, serviceKey, name, warnings));
+    }
+    return dependencies;
+  }
+  warnings.push({
+    service: serviceKey,
+    field: "depends_on",
+    code: "depends_on.shape.invalid",
+    impact: "skipped",
+    message: "depends_on must be a list of service names or a mapping with conditions. It was ignored, so no startup ordering was written."
+  });
+  return dependencies;
+}
+function readDependsSpec(raw, serviceKey, depName, warnings) {
   let condition = "service_started";
   let required = true;
   if (isRecord(raw)) {
     if (raw.required === false) {
       required = false;
     }
-    if (typeof raw.condition === "string" && raw.condition.trim()) {
-      const value = raw.condition.trim();
+    const rawCondition = raw.condition;
+    if (typeof rawCondition === "string" && rawCondition.trim()) {
+      const value = rawCondition.trim();
       if (value === "service_started" || value === "service_healthy" || value === "service_completed_successfully") {
         condition = value;
       } else {
-        stack.warnings.push({
+        warnings.push({
           service: serviceKey,
-          field: "depends_on",
-          message: `Condition ${value} on ${depName} is not a Compose condition this converter maps. Treated as service_started.`
+          field: `depends_on.${depName}.condition`,
+          code: "depends_on.condition.unknown",
+          impact: "skipped",
+          message: `Condition ${value} on ${depName} is not a Compose condition this converter maps. The unit falls back to ${required ? "Requires" : "Wants"}= and After= for ${depName}, which orders startup only and keeps no health or completion guarantee.`
         });
       }
+    } else if (rawCondition !== void 0) {
+      warnings.push({
+        service: serviceKey,
+        field: `depends_on.${depName}.condition`,
+        code: "depends_on.condition.invalid",
+        impact: "skipped",
+        message: `Condition on ${depName} is not a non-empty string. The unit falls back to ${required ? "Requires" : "Wants"}= and After= for ${depName}, which orders startup only and keeps no health or completion guarantee.`
+      });
     }
   }
   return { name: depName, condition, required };
@@ -8210,25 +8242,32 @@ function servicesNeedingHealthyNotify(stack, warnings) {
   const startedWaiters = /* @__PURE__ */ new Map();
   for (const svc of stack.services) {
     for (const dep of svc.dependsOn) {
+      const requiredKey = dep.required ? "Requires" : "Wants";
       if (!known.has(dep.name)) {
+        const conditionNote = dep.condition === "service_started" ? "" : ` The declared condition ${dep.condition} cannot be honored without that unit.`;
+        const orderingNote = dep.required ? `Requires= makes systemd fail to start ${svc.name} until that unit exists.` : `Wants= does not fail startup, but the ordering target is still absent.`;
         warnings.push({
           service: svc.name,
-          field: "depends_on",
-          message: `Service ${dep.name} is not defined in this Compose file. After= was still written, and systemd will not start ${svc.name} until that unit exists.`
+          field: `depends_on.${dep.name}`,
+          code: "depends_on.target.missing",
+          impact: "skipped",
+          message: `Service ${dep.name} is not defined in this Compose file. ${requiredKey}= and After= still target ${sanitizeUnitName(dep.name)}.service. ${orderingNote}${conditionNote}`
         });
       }
       if (!dep.required) {
         warnings.push({
           service: svc.name,
-          field: "depends_on",
+          field: `depends_on.${dep.name}.required`,
           message: `${dep.name} sets required: false. The unit uses Wants= and After= so a stopped dependency does not fail ${svc.name}.`
         });
       }
       if (dep.condition === "service_completed_successfully") {
         warnings.push({
           service: svc.name,
-          field: "depends_on",
-          message: `Compose condition service_completed_successfully for ${dep.name} has no Quadlet key. After= only orders the start. A one-shot init container needs Type=oneshot and RemainAfterExit=yes added by hand on ${sanitizeUnitName(dep.name)}.container.`
+          field: `depends_on.${dep.name}.condition`,
+          code: "depends_on.service_completed_successfully.unsupported",
+          impact: "skipped",
+          message: `Compose condition service_completed_successfully for ${dep.name} has no Quadlet key. ${requiredKey}= and After= only order the start; the exit status is not awaited. A one-shot init container needs Type=oneshot and RemainAfterExit=yes added by hand on ${sanitizeUnitName(dep.name)}.container, and callers still need their own gate on the exit result.`
         });
       } else if (dep.condition === "service_healthy") {
         const list = healthyWaiters.get(dep.name) ?? [];
@@ -8248,20 +8287,26 @@ function servicesNeedingHealthyNotify(stack, warnings) {
       continue;
     }
     if (!depSvc.healthcheck?.cmd) {
-      warnings.push({
-        service: depName,
-        field: "healthcheck",
-        message: `${waiters.join(", ")} wait with condition service_healthy, but ${depName} has no healthcheck.test. Notify=healthy was left off because Podman would never report the unit started.`
-      });
+      for (const waiter of waiters) {
+        warnings.push({
+          service: waiter,
+          field: `depends_on.${depName}.condition`,
+          code: "depends_on.service_healthy.missing_healthcheck",
+          impact: "skipped",
+          message: `${waiter} waits for service_healthy on ${depName}, but ${depName} has no usable healthcheck.test. Notify=healthy was left off because Podman would never report ${depName} as started. ${sanitizeUnitName(waiter)}.container keeps After= and Requires= only, so it may start before ${depName} is ready.`
+        });
+      }
       continue;
     }
     notifyHealthy.add(depName);
     const alsoStarted = startedWaiters.get(depName) ?? [];
-    if (alsoStarted.length > 0) {
+    for (const waiter of alsoStarted) {
       warnings.push({
-        service: depName,
-        field: "depends_on",
-        message: `${waiters.join(", ")} wait for service_healthy and ${alsoStarted.join(", ")} wait for service_started. Notify=healthy makes every After= dependency wait for the healthcheck, which is stricter than Compose service_started.`
+        service: waiter,
+        field: `depends_on.${depName}.condition`,
+        code: "depends_on.service_healthy.stricter_for_service_started",
+        impact: "degraded",
+        message: `${depName} has Notify=healthy because ${waiters.join(", ")} ${waiters.length === 1 ? "waits" : "wait"} for service_healthy. ${waiter} declares service_started and will also wait for the healthcheck, which is stricter than Compose.`
       });
     }
   }
@@ -8874,6 +8919,42 @@ function buildZipArchive(files) {
   view.setUint16(cursor + 20, 0, true);
   return archive;
 }
+var DEPENDENCY_SKIP_FILENAME = "README.txt";
+function dependencySkips(warnings) {
+  return warnings.filter((warning) => warning.impact === "skipped" || warning.impact === "degraded");
+}
+function formatDependencySkipReport(stackName, warnings) {
+  const skips = dependencySkips(warnings);
+  if (skips.length === 0) {
+    return null;
+  }
+  const lines = [
+    `QuadletGen export: ${stackName}`,
+    "",
+    "Skipped or degraded depends_on semantics",
+    "",
+    "After= and Requires= (or Wants= when required: false) in the generated units order startup only.",
+    "They do not wait for a healthcheck, and they do not wait for a container to exit successfully.",
+    ""
+  ];
+  for (const warning of skips) {
+    lines.push(
+      `[${warning.service ?? "stack"}] ${warning.field} (${warning.code ?? "unspecified"})`
+    );
+    lines.push(`  impact: ${warning.impact}`);
+    lines.push(`  ${warning.message}`);
+    lines.push("");
+  }
+  return `${lines.join("\n")}
+`;
+}
+function buildExportEntries(files, stackName, warnings) {
+  const report = formatDependencySkipReport(stackName, warnings);
+  if (!report) {
+    return files;
+  }
+  return [...files, { filename: DEPENDENCY_SKIP_FILENAME, content: report }];
+}
 
 // src/cli.ts
 var VERSION = "0.1.0";
@@ -9125,7 +9206,9 @@ async function runCli(argv) {
     try {
       const zipParent = path.dirname(resolvedZipPath);
       mkdirSync(zipParent, { recursive: true });
-      const zipBytes = buildZipArchive(result.files);
+      const zipBytes = buildZipArchive(
+        buildExportEntries(result.files, stackName, result.warnings)
+      );
       writeFileSync(resolvedZipPath, zipBytes);
       console.error(
         `Successfully exported ${result.files.length} Quadlet file(s) to ${resolvedZipPath}`

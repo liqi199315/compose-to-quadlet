@@ -1,3 +1,5 @@
+import type { ConversionWarning } from './types';
+
 const LOCAL_FILE_HEADER_SIG = 0x04034b50;
 const CENTRAL_DIR_HEADER_SIG = 0x02014b50;
 const END_OF_CENTRAL_DIR_SIG = 0x06054b50;
@@ -151,4 +153,50 @@ export function buildZipArchive(
 	view.setUint16(cursor + 20, 0, true);
 
 	return archive;
+}
+
+const DEPENDENCY_SKIP_FILENAME = 'README.txt';
+
+export function dependencySkips(warnings: ConversionWarning[]): ConversionWarning[] {
+	return warnings.filter((warning) => warning.impact === 'skipped' || warning.impact === 'degraded');
+}
+
+export function formatDependencySkipReport(
+	stackName: string,
+	warnings: ConversionWarning[],
+): string | null {
+	const skips = dependencySkips(warnings);
+	if (skips.length === 0) {
+		return null;
+	}
+	const lines = [
+		`QuadletGen export: ${stackName}`,
+		'',
+		'Skipped or degraded depends_on semantics',
+		'',
+		'After= and Requires= (or Wants= when required: false) in the generated units order startup only.',
+		'They do not wait for a healthcheck, and they do not wait for a container to exit successfully.',
+		'',
+	];
+	for (const warning of skips) {
+		lines.push(
+			`[${warning.service ?? 'stack'}] ${warning.field} (${warning.code ?? 'unspecified'})`,
+		);
+		lines.push(`  impact: ${warning.impact}`);
+		lines.push(`  ${warning.message}`);
+		lines.push('');
+	}
+	return `${lines.join('\n')}\n`;
+}
+
+export function buildExportEntries(
+	files: Array<{ filename: string; content: string }>,
+	stackName: string,
+	warnings: ConversionWarning[],
+): Array<{ filename: string; content: string }> {
+	const report = formatDependencySkipReport(stackName, warnings);
+	if (!report) {
+		return files;
+	}
+	return [...files, { filename: DEPENDENCY_SKIP_FILENAME, content: report }];
 }
