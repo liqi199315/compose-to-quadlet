@@ -92,7 +92,7 @@ export function trackQuadletConverted(unitCount: number | null): void {
 		return;
 	}
 
-	if (typeof unitCount !== 'number' || !Number.isInteger(unitCount) || unitCount < 0) {
+	if (typeof unitCount !== 'number' || !Number.isInteger(unitCount) || unitCount < 1) {
 		return;
 	}
 

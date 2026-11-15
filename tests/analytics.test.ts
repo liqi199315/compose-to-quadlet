@@ -57,6 +57,17 @@ describe('trackQuadletConverted', () => {
 		expect(gtag).toHaveBeenCalledWith('event', 'quadlet_converted', { unit_count: 2 });
 	});
 
+	it('does not send the event when no unit files were produced', () => {
+		const gtag = vi.fn();
+		vi.stubGlobal('window', { gtag });
+
+		trackQuadletConverted(0);
+		trackQuadletConverted(1);
+
+		expect(gtag).toHaveBeenCalledTimes(1);
+		expect(gtag).toHaveBeenCalledWith('event', 'quadlet_converted', { unit_count: 1 });
+	});
+
 	it('does nothing when gtag is missing and still counts the first success', () => {
 		vi.stubGlobal('window', {});
 
