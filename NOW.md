@@ -3,7 +3,7 @@
 ## 当前阶段（2026-11-15）
 
 - **代码版本（2026-11-15 上线）**：`main` 已 rebase 到远端 `8f9b5cb`（GA4 `quadlet_converted` 事件）之上，本地提交为 `e56f446` 发布清单、`6a8ba28` depends_on 映射、`a28274c` 站点图标与 favicon/manifest 接线。三个提交均已 push 到 `origin/main`。
-- **线上版本（2026-11-15）**：`npx wrangler deploy` 成功，Worker Version ID `86820486-1491-484b-b24f-98351bc84914`。线上 `/release.json` 记录 commit `a28274c3ed5f`，与部署时 HEAD 一致，`npm run release:check` 输出 `match`；14 条路由全部 HTTP 200，页面含 `G-PK7MR29S6E`。
+- **线上版本（2026-11-15）**：`npx wrangler deploy` 成功，线上 `/release.json` 的 commit 与部署时 `git rev-parse HEAD` 一致，`npm run release:check` 输出 `match`；14 条路由全部 HTTP 200，页面含 `G-PK7MR29S6E`。Worker Version ID 以 `npx wrangler deployments list` 为准，不在文档里固定。
 - **GA4 注入事故与修复（2026-11-15）**：本轮第一次部署漏了 `PUBLIC_GA4_MEASUREMENT_ID`，线上页面落成 `G-PENDING000` 占位符，而 `release:check` 仍报匹配（清单读的是注册表，不是构建产物）。已用 `PUBLIC_SITE_URL=https://quadletgen.com PUBLIC_GA4_MEASUREMENT_ID=G-PK7MR29S6E` 重建并重新部署；共享清单脚本新增“每个构建 HTML 必须含注册表 measurement ID”的强制校验，测试 10/10。今后构建必须显式带环境变量，`npm run cf:deploy` 单独跑会把占位符发上线。
 - **线上内容（2026-11-15）**：`https://quadletgen.com/sitemap-0.xml` 为 14 条 URL，与本地 `dist/sitemap-0.xml` 完全一致。五个长尾页均为 HTTP `200`：`/quadlet-depends-on-healthcheck/`、`/quadlet-not-starting-on-boot/`、`/podman-pihole-quadlet/`、`/jellyfin-podman-quadlet/`、`/quadlet-vs-docker-compose/`。仓库内的“五页尚未部署”已过时；2026-11-13 记录仍保留当时状态。
 - **本轮验证（2026-11-15，rebase 后）**：`npm run verify:all` 退出码 `0`（Vitest 52/52、Playwright 8/8，14 路由与 12 附属产物）。共享 release 测试 10/10。
