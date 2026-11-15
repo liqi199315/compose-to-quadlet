@@ -535,7 +535,7 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 </section>
 
 <script>
-	import { trackToolEvent } from '../lib/analytics';
+	import { trackQuadletConverted, trackToolEvent } from '../lib/analytics';
 	import { convertToQuadlet } from '../lib/quadlet-engine';
 	import { SAMPLE_TEMPLATES } from '../lib/sample-templates';
 	import type {
@@ -784,6 +784,7 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 			renderSummaryPills(result, installScope);
 
 			if (result.ok) {
+				trackQuadletConverted(result.files.length);
 				const targetDir = getTargetDir(installScope);
 				statusBanner.setAttribute('data-status', 'ok');
 				statusBanner.className =
