@@ -84,3 +84,18 @@ export function trackToolEvent(
 
 	window.gtag('event', trimmedEvent, sanitizeParams(params));
 }
+
+let quadletConvertedTracked = false;
+
+export function trackQuadletConverted(unitCount: number | null): void {
+	if (quadletConvertedTracked) {
+		return;
+	}
+
+	if (typeof unitCount !== 'number' || !Number.isInteger(unitCount) || unitCount < 1) {
+		return;
+	}
+
+	quadletConvertedTracked = true;
+	trackToolEvent('quadlet_converted', { unit_count: unitCount });
+}

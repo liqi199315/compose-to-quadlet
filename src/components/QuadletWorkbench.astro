@@ -535,7 +535,7 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 </section>
 
 <script>
-	import { trackToolEvent } from '../lib/analytics';
+	import { trackQuadletConverted, trackToolEvent } from '../lib/analytics';
 	import { convertToQuadlet } from '../lib/quadlet-engine';
 	import { SAMPLE_TEMPLATES } from '../lib/sample-templates';
 	import type {
@@ -763,7 +763,7 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 			}
 		};
 
-		const runConversion = (): void => {
+		const runConversion = (fromUser: boolean): void => {
 			const installScope = (scopeSelect.value === 'rootful' ? 'rootful' : 'rootless') as InstallScope;
 			const selinuxMode = (
 				selinuxSelect.value === 'shared-z' || selinuxSelect.value === 'private-Z'
@@ -784,6 +784,9 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 			renderSummaryPills(result, installScope);
 
 			if (result.ok) {
+				if (fromUser) {
+					trackQuadletConverted(result.files.length);
+				}
 				const targetDir = getTargetDir(installScope);
 				statusBanner.setAttribute('data-status', 'ok');
 				statusBanner.className =
@@ -851,7 +854,7 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 			}
 			activeUnitFilename = null;
 			syncQuickLoadPills(selectedId);
-			runConversion();
+			runConversion(true);
 			trackToolEvent('template_loaded', { template: selectedId });
 		};
 
@@ -863,7 +866,7 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 			if (dropzoneLabel) {
 				dropzoneLabel.textContent = 'Loaded local file into editor';
 			}
-			runConversion();
+			runConversion(true);
 		};
 
 		const bindDropSurface = (surface: HTMLElement | null): void => {
@@ -930,12 +933,12 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 			if (!currentTemplate || composeInput.value !== currentTemplate.content) {
 				syncQuickLoadPills(null);
 			}
-			runConversion();
+			runConversion(true);
 		});
 
 		stackNameInput.addEventListener('input', () => {
 			stackNameEditedByUser = true;
-			runConversion();
+			runConversion(true);
 		});
 
 		templateSelect.addEventListener('change', () => {
@@ -947,23 +950,23 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 		});
 
 		scopeSelect.addEventListener('change', () => {
-			runConversion();
+			runConversion(true);
 		});
 
 		selinuxSelect.addEventListener('change', () => {
-			runConversion();
+			runConversion(true);
 		});
 
 		autoUpdateCheckbox.addEventListener('change', () => {
-			runConversion();
+			runConversion(true);
 		});
 
 		sharedNetworkCheckbox.addEventListener('change', () => {
-			runConversion();
+			runConversion(true);
 		});
 
 		extractSecretsCheckbox.addEventListener('change', () => {
-			runConversion();
+			runConversion(true);
 		});
 
 		fileUpload.addEventListener('change', async () => {
@@ -1057,7 +1060,7 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 			});
 		});
 
-		runConversion();
+		runConversion(false);
 	}
 
 	document.querySelectorAll<HTMLElement>('[data-workbench-root]').forEach((node) => {
