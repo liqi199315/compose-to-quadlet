@@ -565,6 +565,7 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 
 <script>
 	import { trackQuadletConverted, trackToolEvent } from '../lib/analytics';
+	import { createDebouncedTask } from '../lib/debounce';
 	import { convertToQuadlet } from '../lib/quadlet-engine';
 	import { SAMPLE_TEMPLATES } from '../lib/sample-templates';
 	import type {
@@ -836,7 +837,10 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 			}
 		};
 
+		const INPUT_DEBOUNCE_MS = 250;
+
 		const runConversion = (fromUser: boolean): void => {
+			debouncedConversion.cancel();
 			const installScope = (scopeSelect.value === 'rootful' ? 'rootful' : 'rootless') as InstallScope;
 			const selinuxMode = (
 				selinuxSelect.value === 'shared-z' || selinuxSelect.value === 'private-Z'
@@ -899,7 +903,30 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 			}
 		};
 
+		const debouncedConversion = createDebouncedTask(
+			() => runConversion(true),
+			INPUT_DEBOUNCE_MS,
+			window,
+		);
+
+		const flushOrRunConversion = (): void => {
+			if (!debouncedConversion.flush()) {
+				runConversion(true);
+			}
+		};
+
+		const enablePendingExportButtons = (): void => {
+			if (composeInput.value.trim().length > 0) {
+				copyUnitBtn.disabled = false;
+				downloadZipBtn.disabled = false;
+				if (copyCommandsBtn) {
+					copyCommandsBtn.disabled = false;
+				}
+			}
+		};
+
 		const loadTemplateById = (selectedId: SampleTemplateId): void => {
+			debouncedConversion.flush();
 			const template = SAMPLE_TEMPLATES[selectedId];
 			if (!template) {
 				return;
@@ -919,7 +946,9 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 		};
 
 		const ingestLocalFile = async (file: File): Promise<void> => {
+			debouncedConversion.flush();
 			const text = await file.text();
+			debouncedConversion.cancel();
 			composeInput.value = text;
 			activeUnitFilename = null;
 			syncQuickLoadPills(null);
@@ -993,12 +1022,14 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 			if (!currentTemplate || composeInput.value !== currentTemplate.content) {
 				syncQuickLoadPills(null);
 			}
-			runConversion(true);
+			enablePendingExportButtons();
+			debouncedConversion.schedule();
 		});
 
 		stackNameInput.addEventListener('input', () => {
 			stackNameEditedByUser = true;
-			runConversion(true);
+			enablePendingExportButtons();
+			debouncedConversion.schedule();
 		});
 
 		templateSelect.addEventListener('change', () => {
@@ -1010,28 +1041,29 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 		});
 
 		scopeSelect.addEventListener('change', () => {
-			runConversion(true);
+			flushOrRunConversion();
 		});
 
 		selinuxSelect.addEventListener('change', () => {
-			runConversion(true);
+			flushOrRunConversion();
 		});
 
 		autoUpdateCheckbox.addEventListener('change', () => {
-			runConversion(true);
+			flushOrRunConversion();
 		});
 
 		sharedNetworkCheckbox.addEventListener('change', () => {
-			runConversion(true);
+			flushOrRunConversion();
 		});
 
 		extractSecretsCheckbox.addEventListener('change', () => {
-			runConversion(true);
+			flushOrRunConversion();
 		});
 
 		fileUpload.addEventListener('change', async () => {
 			const file = fileUpload.files?.[0];
 			if (!file) {
+				debouncedConversion.flush();
 				return;
 			}
 			await ingestLocalFile(file);
@@ -1044,21 +1076,30 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 				return;
 			}
 			const button = target.closest('button');
-			if (!button || !currentResult || !currentResult.ok) {
+			if (!button) {
 				return;
 			}
 			const filenameAttr = button.getAttribute('data-unit-filename');
-			if (filenameAttr) {
-				activeUnitFilename = filenameAttr;
-			} else if (button.hasAttribute('data-combined-tab')) {
-				activeUnitFilename = null;
-			} else {
+			const isCombinedTab = button.hasAttribute('data-combined-tab');
+			if (!filenameAttr && !isCombinedTab) {
 				return;
+			}
+			debouncedConversion.flush();
+			if (!currentResult || !currentResult.ok) {
+				return;
+			}
+			if (filenameAttr) {
+				activeUnitFilename = currentResult.files.some((f) => f.filename === filenameAttr)
+					? filenameAttr
+					: null;
+			} else {
+				activeUnitFilename = null;
 			}
 			renderTabsAndOutput(currentResult.files);
 		});
 
 		copyUnitBtn.addEventListener('click', async () => {
+			debouncedConversion.flush();
 			if (!currentResult || !currentResult.ok || !unitOutput.value) {
 				return;
 			}
@@ -1078,6 +1119,7 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 
 		if (copyCommandsBtn) {
 			copyCommandsBtn.addEventListener('click', async () => {
+				debouncedConversion.flush();
 				const commandsText = systemdCommandsBox.textContent?.trim() ?? '';
 				if (!currentResult || !currentResult.ok || !commandsText) {
 					return;
@@ -1098,6 +1140,7 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 		}
 
 		downloadZipBtn.addEventListener('click', () => {
+			debouncedConversion.flush();
 			if (!currentResult || !currentResult.ok || currentResult.files.length === 0) {
 				return;
 			}

@@ -9,6 +9,7 @@ async function buildCli() {
 	await esbuild.build({
 		entryPoints: [path.join(projectRoot, 'src/cli.ts')],
 		bundle: true,
+		preserveSymlinks: true,
 		platform: 'node',
 		format: 'esm',
 		target: 'node18',

@@ -332,4 +332,63 @@ test.describe('Compose to Quadlet converter journeys', () => {
 		expect(zipText).toContain('Notify=healthy');
 		expect(externalRequests).toEqual([]);
 	});
+
+	test('debounces compose and stack-name input by 250ms and flushes synchronously on zip export or option change', async ({
+		page,
+	}) => {
+		await page.goto('/');
+		await expect(page.getByTestId('status-banner')).toHaveAttribute('data-status', 'ok');
+
+		const immediateSnapshot = await page.evaluate(() => {
+			const composeEl = document.querySelector<HTMLTextAreaElement>('[data-testid="compose-input"]')!;
+			const stackEl = document.querySelector<HTMLInputElement>('[data-testid="stack-name-input"]')!;
+			const outputEl = document.querySelector<HTMLTextAreaElement>('[data-testid="unit-output"]')!;
+
+			composeEl.value = [
+				'services:',
+				'  realtime-worker:',
+				'    image: ghcr.io/acme/realtime:1.2.3',
+				'    volumes:',
+				'      - /srv/cache:/cache',
+			].join('\n');
+			composeEl.dispatchEvent(new Event('input', { bubbles: true }));
+
+			stackEl.value = 'acmeshift';
+			stackEl.dispatchEvent(new Event('input', { bubbles: true }));
+
+			return outputEl.value;
+		});
+
+		expect(immediateSnapshot).not.toContain('ghcr.io/acme/realtime:1.2.3');
+
+		const downloadPromise = page.waitForEvent('download');
+		await page.getByTestId('download-zip-btn').click();
+		const download = await downloadPromise;
+
+		expect(download.suggestedFilename()).toBe('acmeshift-quadlet.zip');
+		const flushedOutput = await readOutputText(page.getByTestId('unit-output'));
+		expect(flushedOutput).toContain('Image=ghcr.io/acme/realtime:1.2.3');
+
+		const downloadPath = await download.path();
+		expect(downloadPath).toBeTruthy();
+		const zipText = readFileSync(downloadPath as string, 'utf8');
+		expect(zipText).toContain('Image=ghcr.io/acme/realtime:1.2.3');
+
+		await page.evaluate(() => {
+			const composeEl = document.querySelector<HTMLTextAreaElement>('[data-testid="compose-input"]')!;
+			composeEl.value = [
+				'services:',
+				'  edge-gateway:',
+				'    image: ghcr.io/acme/gateway:2.0.0',
+				'    volumes:',
+				'      - /srv/certs:/certs',
+			].join('\n');
+			composeEl.dispatchEvent(new Event('input', { bubbles: true }));
+		});
+
+		await page.getByTestId('selinux-select').selectOption('private-Z');
+		const optionFlushedOutput = await readOutputText(page.getByTestId('unit-output'));
+		expect(optionFlushedOutput).toContain('Image=ghcr.io/acme/gateway:2.0.0');
+		expect(optionFlushedOutput).toContain('/srv/certs:/certs:Z');
+	});
 });
