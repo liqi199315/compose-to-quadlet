@@ -604,6 +604,12 @@ describe('SAMPLE_TEMPLATES and buildZipArchive', () => {
 			'rootless-boot-nginx',
 			'pihole-rootless',
 			'quadlet-vs-compose',
+			'quadlet-secrets',
+			'debug-quadlet',
+			'traefik-proxy',
+			'rootless-permissions',
+			'systemd-hardening',
+			'migration-guide',
 		];
 
 		expect(Object.keys(SAMPLE_TEMPLATES).sort()).toEqual([...expectedIds].sort());

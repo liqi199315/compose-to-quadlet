@@ -29,6 +29,70 @@ export const ROUTE_PRESETS: QuadletRoutePreset[] = [
 			'Rootless units live in ~/.config/containers/systemd/ and run under your unprivileged user session via systemctl --user without a root daemon.',
 			'Named volumes from top-level Compose volumes blocks become dedicated .volume Quadlet files referenced by unit name in Volume= directives.',
 		],
+		showGeneratedExample: true,
+		exampleLayout: 'split',
+		guideSections: [
+			{
+				id: 'compose-to-systemd-paradigm',
+				eyebrow: 'Architectural Shift',
+				heading: 'From Docker Daemon to Native systemd Supervision',
+				paragraphs: [
+					'Docker Compose relies on a centralized background daemon (dockerd) to manage container lifecycles, monitor health status, and handle restarts. When the Docker daemon restarts or crashes, every container attached to it undergoes service interruption or requires complex live-restore configurations.',
+					'Podman Quadlet replaces this monolithic engine approach by compiling declarative unit definitions directly into native Linux systemd services. Instead of delegating process supervision to a container engine, systemd itself (either system-wide PID 1 or an unprivileged user manager instance via systemctl --user) treats each container as a first-class Linux service.',
+					'This paradigm shift integrates container workloads into standard Linux operations. Containers benefit from journalctl structured logging, systemctl dependency resolution, cgroup v2 resource limits, and systemd watchdog monitoring without any daemon overhead.',
+				],
+				bullets: [
+					'Eliminates the single point of failure represented by a long-running root daemon.',
+					'Enables true rootless container execution where unprivileged users run containers without sudo access.',
+					'Integrates natively with Linux security policies including SELinux, AppArmor, and seccomp profiles.',
+					'Leverages native systemd unit dependency graphs for clean multi-service startup and shutdown sequencing.',
+				],
+			},
+			{
+				id: 'multi-container-dns-network',
+				eyebrow: 'Networking Engine',
+				heading: 'Solving Multi-Container DNS with Shared .network Units',
+				paragraphs: [
+					'A frequent pain point when migrating multi-service Docker Compose stacks to Podman Quadlet involves service discovery. In Docker Compose, services on the default network automatically resolve peer containers by their service names, such as postgres:5432 or redis:6379, through an embedded DNS server in dockerd.',
+					'When converting Compose definitions to isolated Quadlet .container files without a shared network, rootless Podman places each container inside an isolated pasta or slirp4netns network namespace. In this isolated mode, containers cannot resolve each other by name, leading to connection refused or host not found errors.',
+					'QuadletGen resolves this issue (documented in upstream containers/podlet issue 190) by synthesizing a dedicated <stack>.network unit. All participating .container units connect to this shared bridge network with Network=<stack>.network and NetworkAlias= directives. Podman configures netavark and aardvark-dns on the bridge, providing automatic local DNS resolution matching Compose behavior.',
+				],
+				codes: [
+					{
+						title: 'Generated <stack>.network unit file',
+						code: `[Network]
+NetworkName=webapp-network
+Subnet=10.89.0.0/24
+Gateway=10.89.0.1
+IPAMDriver=host-local`,
+					},
+					{
+						title: 'Container network attachment with DNS aliases',
+						code: `[Container]
+Image=docker.io/library/postgres:16-alpine
+Network=webapp.network
+NetworkAlias=postgres
+NetworkAlias=db`,
+					},
+				],
+			},
+			{
+				id: 'depends-on-startup-ordering',
+				eyebrow: 'Lifecycle Contract',
+				heading: 'How depends_on and Healthchecks Map to systemd Directives',
+				paragraphs: [
+					'Docker Compose offers depends_on to order service startup. In systemd, this dependency is expressed through [Unit] After= and Requires= (or Wants= when required: false). However, operators must understand that After= and Requires= order startup only: systemd considers the dependency active as soon as conmon creates the container process, which happens before internal engines like PostgreSQL or MySQL are ready to accept connections.',
+					'To await genuine service readiness, Compose supports condition: service_healthy. QuadletGen maps this condition by adding Notify=healthy under the [Container] section of the dependency unit, provided that dependency declares a usable healthcheck.test command (supported in Podman 5.0 and newer).',
+					'If a dependency lacks a healthcheck, or if a service declares condition: service_completed_successfully, QuadletGen warns that systemd cannot verify readiness or one-shot exit without manual Type=oneshot and RemainAfterExit=yes customization.',
+				],
+				bullets: [
+					'service_started maps to [Unit] After= and Requires=, establishing process startup order without readiness guarantees.',
+					'service_healthy maps to Notify=healthy on the target unit only when that target defines a valid HealthCmd.',
+					'service_completed_successfully has no Quadlet equivalent; one-shot initialization units require manual configuration.',
+					'Mixed dependencies where one caller requests service_started and another requests service_healthy will cause systemd to delay both callers until the healthcheck passes.',
+				],
+			},
+		],
 		faqs: [
 			{
 				question: 'Where do generated Podman Quadlet files go on Linux?',
@@ -78,6 +142,57 @@ export const ROUTE_PRESETS: QuadletRoutePreset[] = [
 			'AutoUpdate requires fully qualified registry image names such as docker.io/library/caddy:2-alpine or ghcr.io/dani-garcia/vaultwarden:latest rather than short aliases.',
 			'Compose restart policies such as unless-stopped and always map to [Service] Restart=always or Restart=on-failure under systemd supervision.',
 			'You can validate generated syntax on any Linux host before reloading systemd by running /usr/libexec/podman/quadlet --dryrun --user.',
+		],
+		showGeneratedExample: true,
+		exampleLayout: 'split',
+		guideSections: [
+			{
+				id: 'autoupdate-timer-workflow',
+				eyebrow: 'Automated Lifecycle',
+				heading: 'Configuring AutoUpdate Registry with systemd Timers',
+				paragraphs: [
+					'The Podman Quadlet AutoUpdate directive connects container lifecycle management to Linux systemd timer automation. When AutoUpdate=registry is present in a [Container] section, Podman adds the container label io.containers.autoupdate=registry during service instantiation.',
+					'Linux distributions shipping Podman provide a system-level or user-level timer named podman-auto-update.timer. When enabled, this timer triggers podman auto-update on a daily schedule, checking upstream registries for newer image digests matching the declared tag.',
+					'If a newer digest exists, Podman pulls the image layer updates, triggers a graceful systemctl restart of the container service, and rolls back if healthchecks fail. Fully qualified registry paths (for example docker.io/library/caddy:2-alpine or ghcr.io/dani-garcia/vaultwarden:latest) are strictly required for reliable resolution.',
+				],
+				codes: [
+					{
+						title: 'Enabling user-mode auto-update timer',
+						code: `systemctl --user enable --now podman-auto-update.timer
+systemctl --user list-timers podman-auto-update.timer`,
+					},
+					{
+						title: 'Testing image update checks manually',
+						code: `podman auto-update --dry-run`,
+					},
+				],
+			},
+			{
+				id: 'rootless-vs-rootful-scopes',
+				eyebrow: 'Deployment Scope',
+				heading: 'Rootless vs Rootful Installation Paths and Boot Behavior',
+				paragraphs: [
+					'Quadlet supports two primary installation scopes on Linux: rootless user-level execution and rootful system-level execution. Rootless unit files live inside ~/.config/containers/systemd/ and are managed via systemctl --user commands without requiring root privileges.',
+					'Rootful unit files live inside /etc/containers/systemd/ and run directly under the system-wide systemd PID 1 manager via sudo systemctl commands. While rootful units can bind privileged ports (like 80 and 443) directly, rootless units isolate container processes within unprivileged user namespaces.',
+					'To ensure rootless services start automatically at host boot without waiting for an interactive SSH session, administrators must enable user lingering with loginctl enable-linger $USER and declare WantedBy=default.target in unit Install sections.',
+				],
+				bullets: [
+					'Rootless path: ~/.config/containers/systemd/ (systemctl --user daemon-reload).',
+					'Rootful path: /etc/containers/systemd/ (sudo systemctl daemon-reload).',
+					'Boot persistence: loginctl enable-linger $USER keeps user systemd running across reboots.',
+					'Low port binding: rootless units can bind port 80/443 after setting net.ipv4.ip_unprivileged_port_start=80.',
+				],
+			},
+			{
+				id: 'preflight-dryrun-verification',
+				eyebrow: 'Validation Tooling',
+				heading: 'Dry-Run Verification Before Reloading systemd',
+				paragraphs: [
+					'Before running daemon-reload on a live server, administrators can preview the compiled service output using Podman internal generator binary in dry-run mode.',
+					'Executing /usr/libexec/podman/quadlet -dryrun -user parses every unit file in ~/.config/containers/systemd/ and prints the exact compiled ExecStart podman run command to terminal standard output without modifying system state.',
+					'This preflight step immediately highlights syntax errors, invalid directive names, missing volume directories, or conflicting network settings before systemd encounters them.',
+				],
+			},
 		],
 		faqs: [
 			{
@@ -129,6 +244,64 @@ export const ROUTE_PRESETS: QuadletRoutePreset[] = [
 			'Container names supplied via --name determine both ContainerName= and the output .container filename.',
 			'Hardware acceleration flags such as --device /dev/dri/renderD128:/dev/dri/renderD128 convert directly to AddDevice= for Jellyfin, Plex, or Frigate workloads.',
 		],
+		showGeneratedExample: true,
+		exampleLayout: 'split',
+		guideSections: [
+			{
+				id: 'cli-tokenization-rules',
+				eyebrow: 'CLI Translation',
+				heading: 'Translating Complex Shell Snippets into Declarative Units',
+				paragraphs: [
+					'Running containers using long docker run or podman run commands often leads to unwieldy shell scripts with backslash line continuations, fragile quote escaping, and unmanaged background processes.',
+					'QuadletGen tokenizer normalizes multiline CLI snippets in the browser, parsing quotes and equals-sign syntax into structured directives. Repeated flags such as -p 80:80 -p 443:443 cleanly translate into multiple PublishPort= lines, and bind mount options like :ro or :Z are preserved in Volume= keys.',
+					'The container name supplied with --name determines both the systemd service name and the ContainerName= directive, establishing a predictable naming convention across your server.',
+				],
+				codes: [
+					{
+						title: 'Original docker run command',
+						code: `docker run -d \\
+  --name media-server \\
+  -p 8096:8096 \\
+  -v /srv/media:/media:ro \\
+  --device /dev/dri \\
+  jellyfin/jellyfin:latest`,
+					},
+					{
+						title: 'Compiled Quadlet .container unit',
+						code: `[Container]
+Image=docker.io/jellyfin/jellyfin:latest
+ContainerName=media-server
+PublishPort=8096:8096
+Volume=/srv/media:/media:ro
+AddDevice=/dev/dri`,
+					},
+				],
+			},
+			{
+				id: 'redundant-daemon-flags',
+				eyebrow: 'Flag Translation',
+				heading: 'Why -d, --rm, and --restart Are Stripped from Quadlet Units',
+				paragraphs: [
+					'In imperative container workflows, flags like -d (detach) and --rm (cleanup on stop) tell the CLI client how to handle terminal attachment and container removal after process exit.',
+					'Under systemd supervision, container lifecycles are monitored directly by systemd and conmon. Running in the background is the native state of a system service, and post-stop container cleanup is governed by systemd service lifecycle hooks.',
+					'For this reason, Quadlet does not support -d or --rm flags and strips them automatically. The CLI restart policy --restart unless-stopped converts directly to standard systemd supervision with [Service] Restart=always.',
+				],
+			},
+			{
+				id: 'hardware-acceleration-dri',
+				eyebrow: 'Hardware Passthrough',
+				heading: 'Passing Intel QuickSync and AMD VAAPI Devices to Containers',
+				paragraphs: [
+					'Workloads such as Jellyfin, Plex, and Frigate NVR require direct access to GPU render nodes (/dev/dri/renderD128) to perform hardware video transcoding without saturating the CPU.',
+					'In rootless Quadlet units, passing --device /dev/dri generates AddDevice=/dev/dri. To allow the unprivileged container process to access host GPU device nodes, administrators should include GroupAdd=keep-groups so user membership in the host render and video groups carries into the container namespace.',
+				],
+				bullets: [
+					'AddDevice=/dev/dri exposes host GPU nodes inside the container.',
+					'GroupAdd=keep-groups inherits host video and render GID permissions.',
+					'UserNS=keep-id aligns user accounts to maintain access to local media directories.',
+				],
+			},
+		],
 		faqs: [
 			{
 				question: 'Which docker run and podman run flags does the converter recognize?',
@@ -178,6 +351,43 @@ export const ROUTE_PRESETS: QuadletRoutePreset[] = [
 			'Shared :z applies a group container_file_t label without container-exclusive MCS categories, which is required when Nextcloud and Nginx or backup sidecars mount the same host path.',
 			'Named Podman volumes (.volume units) live under ~/.local/share/containers/storage/volumes/ and receive SELinux labels from Podman automatically without needing :Z.',
 			'Rootless services stop when your last SSH session closes unless user lingering is enabled via sudo loginctl enable-linger $USER.',
+		],
+		showGeneratedExample: true,
+		exampleLayout: 'split',
+		guideSections: [
+			{
+				id: 'selinux-mcs-isolation',
+				eyebrow: 'SELinux Mount Security',
+				heading: 'Comparing Private :Z and Shared :z Mount Labels',
+				paragraphs: [
+					'SELinux enforces Mandatory Access Control on distributions such as Fedora, RHEL, CentOS Stream, and Fedora CoreOS. By default, processes running inside container domains (container_t) are prevented from reading or writing arbitrary files in the host filesystem, resulting in permission denied errors on bind mounts.',
+					'Appending :Z to a bind mount instructs Podman to relabel the host directory with an exclusive Multi-Category Security (MCS) label (for example system_u:object_r:container_file_t:s0:c123,c456). Only the specific container assigned those categories can access the files, providing robust isolation for dedicated database directories.',
+					'Appending :z applies the generic container_file_t type without container-specific categories. This shared label allows multiple distinct containers (such as Nextcloud and a web server frontend) to access the same directory simultaneously.',
+				],
+				bullets: [
+					'Private :Z: Exclusive access for single-container state (Postgres, MariaDB, Redis).',
+					'Shared :z: Multi-container shared access (web static assets, shared upload folders).',
+					'Named volumes: Automated SELinux management without manual relabel flags.',
+				],
+			},
+			{
+				id: 'named-volumes-vs-bind-mounts',
+				eyebrow: 'Storage Types',
+				heading: 'Named .volume Units vs Host Directory Bind Mounts',
+				paragraphs: [
+					'Quadlet supports both host bind mounts and named Podman volumes. Named volumes declared in Compose volumes blocks map to dedicated .volume unit files stored under ~/.local/share/containers/storage/volumes/ in rootless mode.',
+					'Because Podman manages the lifecycle and security contexts of named volumes internally, administrators do not need to append :z or :Z to named volume declarations. Bind mounts to arbitrary host paths, however, require explicit SELinux flags to prevent access denials.',
+				],
+			},
+			{
+				id: 'system-paths-warning',
+				eyebrow: 'Security Precautions',
+				heading: 'Critical System Directories You Must Never Relabel with :Z',
+				paragraphs: [
+					'Applying :z or :Z relabels all files and subdirectories recursively. Never bind mount top-level host paths like /, /etc, /usr, /var, or your unconstrained home directory (~/) with relabeling flags.',
+					'Relabeling system paths changes their security context to container_file_t, which can block host services like sshd, systemd-logind, and PAM from reading required configuration files. Always place container data in dedicated application folders, such as ~/containers/<stack>/data.',
+				],
+			},
 		],
 		faqs: [
 			{
@@ -229,6 +439,47 @@ export const ROUTE_PRESETS: QuadletRoutePreset[] = [
 			'Model caches and database directories use named .volume units while media upload folders stay mapped as host bind mounts.',
 			'Sensitive keys matching password, secret, token, or key patterns move into <stack>.env and connect via EnvironmentFile= across participating containers.',
 		],
+		showGeneratedExample: true,
+		exampleLayout: 'stacked',
+		guideSections: [
+			{
+				id: 'multi-tier-immich-architecture',
+				eyebrow: 'Complex Stacks',
+				heading: 'Orchestrating Immich Microservices Under systemd',
+				paragraphs: [
+					'Self-hosted photo management with Immich represents a modern microservices architecture comprising four interconnected components: the primary web application server, background machine learning workers, Redis key-value cache, and PostgreSQL with pgvector extensions.',
+					'In Docker Compose, these services communicate over an implicit bridge network. In QuadletGen, compiling the Immich stack outputs four dedicated .container units and one shared immich.network file. Each container is configured with Network=immich.network and NetworkAlias directives, allowing the server to connect to redis:6379 and database:5432 seamlessly.',
+				],
+				codes: [
+					{
+						title: 'Immich stack unit orchestration overview',
+						code: `# Unit dependency graph generated for Immich
+immich-postgres.container -> Storage: immich-pgdata.volume
+immich-redis.container    -> Storage: in-memory cache
+immich-machine-learning   -> Storage: immich-model-cache.volume
+immich-server             -> Storage: /srv/photos (bind mount)`,
+					},
+				],
+			},
+			{
+				id: 'hybrid-storage-strategy',
+				eyebrow: 'Storage Design',
+				heading: 'Hybrid Storage Design for Databases and Large Media Libraries',
+				paragraphs: [
+					'Self-hosted deployments require a hybrid storage model: small, high-churn state (such as PostgreSQL database directories and vector embeddings) should use named Podman volumes (.volume units) stored in ~/.local/share/containers/storage/volumes/.',
+					'Large media libraries (such as original RAW photos and video files) should reside on dedicated host storage partitions bind mounted with :z or :Z flags. This keeps backup policies separated and prevents container storage engines from duplicating multi-terabyte libraries.',
+				],
+			},
+			{
+				id: 'credential-isolation-env',
+				eyebrow: 'Secret Hygiene',
+				heading: 'Isolating Passwords into chmod 600 Environment Files',
+				paragraphs: [
+					'Multi-tier stacks require multiple shared secrets, including DB_PASSWORD, JWT_SECRET, and REDIS_PASSWORD. Hardcoding these credentials directly in systemd unit files creates security risks when committing infrastructure configurations to version control.',
+					'Toggling secret extraction in QuadletGen moves sensitive parameters into a companion <stack>.env file. Setting chmod 600 on this file ensures that only your unprivileged user account can read database passwords on the server.',
+				],
+			},
+		],
 		faqs: [
 			{
 				question: 'Do Compose connection hostnames like postgres or redis still work in Quadlet?',
@@ -278,6 +529,45 @@ export const ROUTE_PRESETS: QuadletRoutePreset[] = [
 			'Automatically synthesizes a shared <stack>.network unit even when the input compose.yaml relies on Docker Compose implicit default networking.',
 			'Packages every generated .container, .network, .volume, and .env file into a standards-compliant PKZIP archive ready to copy over scp or sftp.',
 			'Displays exact systemctl reload and service start commands matched to your chosen rootless or rootful install scope.',
+		],
+		showGeneratedExample: true,
+		exampleLayout: 'stacked',
+		guideSections: [
+			{
+				id: 'browser-vs-cli-packaging',
+				eyebrow: 'Zero-Install Packaging',
+				heading: 'Online Multi-Container Packaging Without Rust or Cargo',
+				paragraphs: [
+					'The upstream containers/podlet command-line tool is a Rust utility that requires installing Cargo or fetching precompiled Linux binary packages. While effective for single-container command conversions on a Linux host, running it on macOS or Windows developer machines requires setup overhead.',
+					'QuadletGen runs its parser and packaging engine entirely in client-side JavaScript. Developers can convert complex multi-service stacks on their workstations, preview unit files interactively, and export a ready-to-deploy archive without installing local container runtimes.',
+				],
+			},
+			{
+				id: 'zip-archive-structure',
+				eyebrow: 'Archive Contents',
+				heading: 'Structure of the Downloaded Deployment ZIP Archive',
+				paragraphs: [
+					'Clicking Download .zip Bundle builds a standard PKZIP archive in browser memory. The archive packages every compiled .container file, the shared .network bridge definition, named .volume declarations, extracted .env credential files, and a comprehensive README.txt.',
+					'The included README.txt details the required file permissions, systemctl reload commands, and explicit notices regarding any Compose directives (such as depends_on condition: service_completed_successfully) that require manual adjustment.',
+				],
+			},
+			{
+				id: 'server-deployment-workflow',
+				eyebrow: 'Server Runbook',
+				heading: 'Deploying the Quadlet Bundle to Remote Linux Servers',
+				paragraphs: [
+					'Deploying the downloaded bundle to a remote Linux VPS requires four simple shell commands. Transfer the archive using scp, unpack into ~/.config/containers/systemd/, set restricted permissions on environment files, and instruct systemd to compile the units.',
+				],
+				codes: [
+					{
+						title: 'Complete remote host deployment commands',
+						code: `scp appstack-quadlet.zip server:~/.config/containers/systemd/
+ssh server "cd ~/.config/containers/systemd && unzip -o appstack-quadlet.zip"
+ssh server "chmod 600 ~/.config/containers/systemd/*.env 2>/dev/null || true"
+ssh server "systemctl --user daemon-reload && systemctl --user start appstack-*.service"`,
+					},
+				],
+			},
 		],
 		faqs: [
 			{
@@ -395,6 +685,12 @@ const PRESET_BADGE_MAP: Record<string, string> = {
 	'podman-pihole-quadlet': 'Rootless DNS',
 	'jellyfin-podman-quadlet': 'Jellyfin /dev/dri',
 	'quadlet-vs-docker-compose': 'Compose Comparison',
+	'podman-quadlet-secrets-management': 'Secrets & Security',
+	'debug-podman-quadlet-systemd-errors': 'Debug & Diagnostic',
+	'traefik-podman-quadlet-reverse-proxy': 'Traefik & Reverse Proxy',
+	'rootless-podman-quadlet-permissions-keep-id': 'UID Mapping & keep-id',
+	'systemd-quadlet-resource-limits-hardening': 'Resource Limits & Hardening',
+	'docker-compose-to-podman-quadlet-migration-guide': 'Migration Playbook',
 };
 
 export function getRelatedGuideCards(currentPath: string): RelatedGuideCard[] {

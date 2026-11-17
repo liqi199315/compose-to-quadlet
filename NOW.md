@@ -26,7 +26,7 @@
 
 - **多模式转换引擎与类型契约（`src/lib/`）**：支持 `compose-yaml` 与 `docker-run` / `podman-run` 输入解析，`rootless` / `rootful` 安装目录切换，`none` / `shared-z` / `private-Z` SELinux 卷重打标，自动合成共享 `.network` 单元解决容器间 DNS 解析（`podlet#190`），敏感环境变量分离至 `.env`，以及纯前端 PKZIP 归档打包。
 - **`depends_on.condition` 映射与跳过清单（2026-11-15）**：数组形式与 `service_started` 只生成启动顺序（`After=` + `Requires=`，`required: false` 时为 `Wants=`）。`service_healthy` 仅在依赖项有可用 `healthcheck.test` 时给依赖单元加 `Notify=healthy`；没有健康检查、`service_completed_successfully`、未知或非法 condition、缺失依赖目标、非法 `depends_on` 形态都会带稳定 `code` 与 `impact: skipped/degraded`。这些条目同时显示在工作台 `dependency-skip-list`，并写入 ZIP 内 `README.txt`。同一依赖被 `service_started` 与 `service_healthy` 混用时按 degraded 提示 `Notify=healthy` 更严格。
-- **14 个静态内容路由（11 个工具页 + 3 个 E-E-A-T 信任与合规页）**：
+- **20 个静态内容路由（17 个工具页 + 3 个 E-E-A-T 信任与合规页）**：
   1. `/`（Docker Compose to Quadlet 主工作台）
   2. `/podman-quadlet-generator/`（Podman Quadlet 生成器与 AutoUpdate 预设）
   3. `/docker-run-to-quadlet-converter/`（Docker Run / Podman Run 转 Quadlet 转换器）
@@ -38,9 +38,15 @@
   9. `/podman-pihole-quadlet/`（rootless Pi-hole，端口 53）
   10. `/jellyfin-podman-quadlet/`（既有 Jellyfin docker run 模板，`/dev/dri`）
   11. `/quadlet-vs-docker-compose/`（同一栈对照并链到以上四页）
-  12. `/about/`（Podman 4.4+/5.x `podman-system-generator` 规范对齐说明、共享 `.network` 解决 `podlet#190` 跨容器 DNS 原理、100% 本地内存运行架构、非官方声明与 `hello@quadletgen.com` 联系入口）
-  13. `/privacy/`（`docker-compose.yml` 与密钥零上传承诺、匿名化 GA4 事件策略、GDPR 与 CCPA/CPRA 权利说明）
-  14. `/terms/`（MIT 开源使用条款、上线前测试环境审查 systemd 单元与 SELinux 标签的操作员责任、Linux VPS `rel="sponsored"` 联盟披露规范）
+  12. `/podman-quadlet-secrets-management/`（Podman Quadlet Secret 凭据与加密管理）
+  13. `/debug-podman-quadlet-systemd-errors/`（Quadlet 5 级排障诊断决策树与 dryrun 日志排查）
+  14. `/traefik-podman-quadlet-reverse-proxy/`（Traefik v3 配合 Rootless Podman Socket 与自动 SSL）
+  15. `/rootless-podman-quadlet-permissions-keep-id/`（Rootless 卷权限、UserNS=keep-id 与 subuid 映射）
+  16. `/systemd-quadlet-resource-limits-hardening/`（cgroup v2 资源限额 MemoryMax/CPUQuota 与服务安全沙箱）
+  17. `/docker-compose-to-podman-quadlet-migration-guide/`（生产迁移白皮书、卷 tar 流式迁移与 Ansible 自动化）
+  18. `/about/`（Podman 4.4+/5.x `podman-system-generator` 规范对齐说明、共享 `.network` 解决 `podlet#190` 跨容器 DNS 原理、100% 本地内存运行架构、非官方声明与 `hello@quadletgen.com` 联系入口）
+  19. `/privacy/`（`docker-compose.yml` 与密钥零上传承诺、匿名化 GA4 事件策略、GDPR 与 CCPA/CPRA 权利说明）
+  20. `/terms/`（MIT 开源使用条款、上线前测试环境审查 systemd 单元与 SELinux 标签的操作员责任、Linux VPS `rel="sponsored"` 联盟披露规范）
 - **全套技术 SEO 与安全静态产物**：站点图标（`favicon.svg`、`favicon-32.png`、`icon-192.png`、`icon-512.png`、`apple-touch-icon.png`，PWA manifest 与结构化数据 logo 已引用）、`404.html`、`sitemap-index.xml`、`robots.txt`、`llms.txt`、`_headers`（含 `workers.dev` 与 `pages.dev` 预览域名 `X-Robots-Tag: noindex` 防串台头）、`og-image.svg`、`og-image.png`（1200x630 栅格化社交浏览卡片）、`github-social-preview.png`（1280x640 GitHub 社交预览卡片）、`site.webmanifest`、`indexnow-key.txt` 以及 `c9d2e4f73a814b629d4c35e8f2a16c53.txt` 双重 IndexNow 探测校验文件。
 - **独立 Node ESM CLI 与完整测试套件（`bin/compose-to-quadlet.mjs`、`tests/cli.test.ts`）**：通过 esbuild 独立打包 `src/cli.ts`，支持 `--input`、`--run`、`--stack`、`--scope`、`--selinux`、`--out-dir`、`--stdout`、`--zip` 与 `--help`（指向 `https://quadletgen.com`），并通过 Vitest 11 项端到端 CLI 测试覆盖。
 - **全套发布工具包（`LAUNCH_KIT.md`）与 GitHub 准产 `README.md`**：包含 X 25 秒视频分镜与发帖话术、3 条布尔痛点搜索词与价值优先回复模板、Hacker News Show HN 事实备忘、Reddit（r/podman、r/selfhosted、r/linuxadmin）发帖模板、Console.dev 投稿草案及 upstream podlet#190 技术规避评论模版。
@@ -71,3 +77,4 @@
 - `2026-11-13` `[AI]`：接入 512px 站点图标：新增 `public/icon-512.png`、`icon-192.png`、`apple-touch-icon.png`、`favicon-32.png`，`site.webmanifest` 增加 192/512 PNG 图标，`BaseLayout.astro` 增加 PNG favicon 与 apple-touch-icon 引用，结构化数据 `Organization.logo` 改为 `/icon-512.png`；`npm run verify:all` 退出码 `0`（9 路由 SEO 门禁 `ok: true`，6 条 Playwright E2E 全过）。
 - `2026-11-15` `[AI]`：收口 `depends_on.condition` 映射缺口（C06）：`service_healthy` 有可用健康检查时继续输出 `Notify=healthy`；无健康检查、`service_completed_successfully`、未知或非法 condition、缺失目标、非法 `depends_on` 形态改为稳定 `code` + `impact` 警告。工作台新增 `dependency-skip-list`，ZIP（浏览器与 CLI `--zip`）在存在跳过/降级项时写入 `README.txt` 跳过清单。新增 `tests/fixtures/depends-on-conditions.yaml`、`depends-on-invalid.yaml`、`tests/depends-on-conditions.test.ts` 与 Playwright 下载核验。本地 WIP commit `c6ef95f`；`npm run verify:all` 退出码 `0`（Vitest 46 项、14 路由 SEO 门禁 `ok: true`、Playwright 8 项）；`npm run release:check` 状态 `pending_live_manifest`，本地 14 / 线上 14 路由匹配，线上 `release.json` 缺失，commit 未证明。未 push，未部署。
 - `2026-11-15` `[AI]`：独立核验前文档收口。主会话最终 `npm run verify:all` 退出码 `0`（46/46、8/8）；共享 release 测试 9/9。发布核对的本地 commit 记为 `c6ef95f`，不是 `82de93d`。线上 `release.json` 缺失，任何本地 commit 未证明已上线。当前流量改为 2026-11-14 实拉 GA4：56 会话、7 互动、0 `quadlet_export`（两天小样本；GSC / Bing 查询未形成）。2026-11-12 私有仓库句标为当时历史。SEO 附属产物改为 12，含 `release.json`。未改代码与测试，未 commit，未 push，未部署。
+- `2026-11-17` `[AI]`：完成存量 6 个核心页增厚与 6 个高意图长尾子页面扩充。在 `src/lib/route-presets.ts` 为 `/` 及前 5 个核心预设页补齐 800+ 词深度 `guideSections` 与静态输入/输出样例；在 `src/lib/longtail-presets.ts` 与 `src/lib/sample-templates.ts` 新增 6 个深度子页面（`/podman-quadlet-secrets-management/`、`/debug-podman-quadlet-systemd-errors/`、`/traefik-podman-quadlet-reverse-proxy/`、`/rootless-podman-quadlet-permissions-keep-id/`、`/systemd-quadlet-resource-limits-hardening/`、`/docker-compose-to-podman-quadlet-migration-guide/`）；`src/pages/index.astro` 同步支持预渲染样例与深度指南；`tests/e2e/quadlet.spec.ts` 覆盖全部 11 个长尾路由及移动端 375 视口；全站静态路由扩充至 20 条；`npm run verify:all` 退出码 `0`（Vitest 52/52、20 路由 SEO 门禁 `ok: true`、Playwright 8/8 全过）。未 push，未部署。

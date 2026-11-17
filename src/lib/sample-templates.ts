@@ -323,4 +323,133 @@ volumes:
   caddy-data:
 `,
 	},
+	'quadlet-secrets': {
+		label: 'Postgres & API with Secret Storage',
+		stackName: 'securestack',
+		mode: 'compose-yaml',
+		content: `services:
+  db:
+    image: docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_USER: secureuser
+      POSTGRES_DB: securedb
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  api:
+    image: docker.io/library/node:22-alpine
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://secureuser@db:5432/securedb
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+`,
+	},
+	'debug-quadlet': {
+		label: 'Nginx Web Unit for Troubleshooting',
+		stackName: 'troubleshoot',
+		mode: 'compose-yaml',
+		content: `services:
+  web:
+    image: docker.io/library/nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./html:/usr/share/nginx/html
+    restart: on-failure
+`,
+	},
+	'traefik-proxy': {
+		label: 'Traefik v3 Reverse Proxy & Whoami',
+		stackName: 'traefik',
+		mode: 'compose-yaml',
+		content: `services:
+  traefik:
+    image: docker.io/library/traefik:v3.1
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /run/user/1000/podman/podman.sock:/var/run/docker.sock
+    restart: always
+
+  whoami:
+    image: docker.io/traefik/whoami:v1.10
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(\`whoami.local\`)"
+    restart: unless-stopped
+`,
+	},
+	'rootless-permissions': {
+		label: 'Rootless User 1000 Volume Alignment',
+		stackName: 'appstack',
+		mode: 'compose-yaml',
+		content: `services:
+  app:
+    image: docker.io/library/node:22-alpine
+    user: "1000:1000"
+    working_dir: /srv/app
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/srv/app/data
+    environment:
+      DATA_DIR: /srv/app/data
+    restart: unless-stopped
+`,
+	},
+	'systemd-hardening': {
+		label: 'Hardened Caddy Service Sandbox',
+		stackName: 'hardened',
+		mode: 'compose-yaml',
+		content: `services:
+  secureweb:
+    image: docker.io/library/caddy:2-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data:/data
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+`,
+	},
+	'migration-guide': {
+		label: 'Two-Tier Production Migration Stack',
+		stackName: 'production',
+		mode: 'compose-yaml',
+		content: `services:
+  frontend:
+    image: docker.io/library/nginx:1.27-alpine
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always
+
+  backend:
+    image: docker.io/library/python:3.12-alpine
+    working_dir: /app
+    command: ["python", "app.py"]
+    volumes:
+      - app-storage:/app/storage
+    environment:
+      APP_ENV: production
+    restart: unless-stopped
+
+volumes:
+  app-storage:
+`,
+	},
 };

@@ -51,7 +51,13 @@ export type SampleTemplateId =
 	| 'healthcheck-depends'
 	| 'rootless-boot-nginx'
 	| 'pihole-rootless'
-	| 'quadlet-vs-compose';
+	| 'quadlet-vs-compose'
+	| 'quadlet-secrets'
+	| 'debug-quadlet'
+	| 'traefik-proxy'
+	| 'rootless-permissions'
+	| 'systemd-hardening'
+	| 'migration-guide';
 
 export interface GuideCodeBlock {
 	title: string;

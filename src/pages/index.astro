@@ -1,6 +1,8 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import QuadletWorkbench from '../components/QuadletWorkbench.astro';
+import { convertToQuadlet } from '../lib/quadlet-engine';
+import { SAMPLE_TEMPLATES } from '../lib/sample-templates';
 import {
 	getPresetBySlug,
 	getRelatedGuideCards,
@@ -13,6 +15,18 @@ if (!preset) {
 }
 
 const relatedCards = getRelatedGuideCards(preset.path);
+const exampleTemplate = preset.showGeneratedExample
+	? SAMPLE_TEMPLATES[preset.defaultTemplateId]
+	: undefined;
+const exampleResult = exampleTemplate
+	? convertToQuadlet(exampleTemplate.content, preset.defaultOptions)
+	: undefined;
+const exampleOutput =
+	exampleResult && exampleResult.ok
+		? exampleResult.files
+				.map((file) => `# === ${file.filename} (${file.installPath}) ===\n${file.content.trimEnd()}`)
+				.join('\n\n')
+		: '';
 ---
 
 <BaseLayout
@@ -68,6 +82,110 @@ const relatedCards = getRelatedGuideCards(preset.path);
 	</section>
 
 	<QuadletWorkbench preset={preset} />
+
+	{
+		exampleTemplate && exampleOutput && (
+			<section
+				id="worked-example"
+				aria-labelledby="worked-example-heading"
+				class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8"
+			>
+				<div class="min-w-0 rounded-xl border border-slate-800 bg-slate-900/60 p-5 sm:p-8">
+					<p class="font-mono text-xs font-semibold uppercase tracking-wider text-cyan-400">
+						Input and output
+					</p>
+					<h2 id="worked-example-heading" class="mt-1.5 text-xl font-semibold text-white sm:text-2xl">
+						Units this page already generated
+					</h2>
+					<p class="mt-2 max-w-3xl text-sm leading-relaxed text-slate-300">
+						The workbench above is loaded with this input. Copy a unit or download the ZIP there. Both actions stay in the browser on quadletgen.com.
+					</p>
+					<div
+						class:list={[
+							'mt-5 grid min-w-0 gap-4',
+							preset.exampleLayout === 'split' && 'lg:grid-cols-2',
+						]}
+					>
+						<div class="min-w-0">
+							<h3 class="text-sm font-semibold text-white">Compose or docker run input</h3>
+							<pre class="mt-2 max-w-full overflow-x-auto rounded-lg border border-slate-800 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-200">{exampleTemplate.content.trimEnd()}</pre>
+						</div>
+						<div class="min-w-0">
+							<h3 class="text-sm font-semibold text-white">Quadlet files from that input</h3>
+							<pre class="mt-2 max-w-full overflow-x-auto rounded-lg border border-slate-800 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-200">{exampleOutput}</pre>
+						</div>
+					</div>
+				</div>
+			</section>
+		)
+	}
+
+	{
+		preset.guideSections && preset.guideSections.length > 0 && (
+			<div class="mx-auto max-w-7xl space-y-6 px-4 py-2 sm:px-6 lg:px-8">
+				{
+					preset.guideSections.map((section) => (
+						<section
+							id={section.id}
+							aria-labelledby={`${section.id}-heading`}
+							class="min-w-0 rounded-xl border border-slate-800 bg-slate-900/60 p-5 sm:p-8"
+						>
+							<p class="font-mono text-xs font-semibold uppercase tracking-wider text-cyan-400">
+								{section.eyebrow}
+							</p>
+							<h2 id={`${section.id}-heading`} class="mt-1.5 text-xl font-semibold text-white sm:text-2xl">
+								{section.heading}
+							</h2>
+							<div class="mt-3 max-w-3xl space-y-3 text-sm leading-relaxed text-slate-300">
+								{section.paragraphs.map((paragraph) => (
+									<p>{paragraph}</p>
+								))}
+							</div>
+							{
+								section.bullets && section.bullets.length > 0 && (
+									<ul class="mt-4 max-w-3xl list-disc space-y-2 pl-5 text-sm leading-relaxed text-slate-300">
+										{section.bullets.map((bullet) => (
+											<li>{bullet}</li>
+										))}
+									</ul>
+								)
+							}
+							{
+								section.codes && section.codes.length > 0 && (
+									<div class="mt-5 grid min-w-0 gap-4">
+										{section.codes.map((block) => (
+											<div class="min-w-0">
+												<h3 class="text-sm font-semibold text-white">{block.title}</h3>
+												<pre class="mt-2 max-w-full overflow-x-auto rounded-lg border border-slate-800 bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-200">{block.code}</pre>
+											</div>
+										))}
+									</div>
+								)
+							}
+							{
+								section.links && section.links.length > 0 && (
+									<ul class="mt-4 flex flex-col gap-2 text-sm">
+										{section.links.map((link) => (
+											<li>
+												<a
+													href={link.href}
+													class="font-medium text-cyan-300 underline decoration-cyan-500/40 underline-offset-4 hover:text-cyan-200"
+													rel={link.external ? 'noopener noreferrer' : undefined}
+													target={link.external ? '_blank' : undefined}
+												>
+													{link.label}
+												</a>
+											</li>
+										))}
+									</ul>
+								)
+							}
+						</section>
+					))
+				}
+			</div>
+		)
+	}
 
 	<section
 		id="cheat-sheet"

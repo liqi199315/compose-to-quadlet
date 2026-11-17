@@ -72,6 +72,42 @@ export const CONTENT_ROUTES = [
 		isToolRoute: true,
 	},
 	{
+		route: '/podman-quadlet-secrets-management/',
+		file: 'podman-quadlet-secrets-management/index.html',
+		canonical: `${SITE_ORIGIN}/podman-quadlet-secrets-management/`,
+		isToolRoute: true,
+	},
+	{
+		route: '/debug-podman-quadlet-systemd-errors/',
+		file: 'debug-podman-quadlet-systemd-errors/index.html',
+		canonical: `${SITE_ORIGIN}/debug-podman-quadlet-systemd-errors/`,
+		isToolRoute: true,
+	},
+	{
+		route: '/traefik-podman-quadlet-reverse-proxy/',
+		file: 'traefik-podman-quadlet-reverse-proxy/index.html',
+		canonical: `${SITE_ORIGIN}/traefik-podman-quadlet-reverse-proxy/`,
+		isToolRoute: true,
+	},
+	{
+		route: '/rootless-podman-quadlet-permissions-keep-id/',
+		file: 'rootless-podman-quadlet-permissions-keep-id/index.html',
+		canonical: `${SITE_ORIGIN}/rootless-podman-quadlet-permissions-keep-id/`,
+		isToolRoute: true,
+	},
+	{
+		route: '/systemd-quadlet-resource-limits-hardening/',
+		file: 'systemd-quadlet-resource-limits-hardening/index.html',
+		canonical: `${SITE_ORIGIN}/systemd-quadlet-resource-limits-hardening/`,
+		isToolRoute: true,
+	},
+	{
+		route: '/docker-compose-to-podman-quadlet-migration-guide/',
+		file: 'docker-compose-to-podman-quadlet-migration-guide/index.html',
+		canonical: `${SITE_ORIGIN}/docker-compose-to-podman-quadlet-migration-guide/`,
+		isToolRoute: true,
+	},
+	{
 		route: '/about/',
 		file: 'about/index.html',
 		canonical: `${SITE_ORIGIN}/about/`,

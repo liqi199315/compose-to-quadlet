@@ -216,6 +216,12 @@ test.describe('Compose to Quadlet converter journeys', () => {
 			{ path: '/podman-pihole-quadlet/', output: 'PublishPort=53:53/udp' },
 			{ path: '/jellyfin-podman-quadlet/', output: 'AddDevice=/dev/dri:/dev/dri' },
 			{ path: '/quadlet-vs-docker-compose/', output: 'Network=edge.network' },
+			{ path: '/podman-quadlet-secrets-management/', output: '[Container]' },
+			{ path: '/debug-podman-quadlet-systemd-errors/', output: '[Container]' },
+			{ path: '/traefik-podman-quadlet-reverse-proxy/', output: '[Container]' },
+			{ path: '/rootless-podman-quadlet-permissions-keep-id/', output: '[Container]' },
+			{ path: '/systemd-quadlet-resource-limits-hardening/', output: '[Container]' },
+			{ path: '/docker-compose-to-podman-quadlet-migration-guide/', output: '[Container]' },
 		];
 
 		for (const route of routes) {

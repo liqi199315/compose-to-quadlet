@@ -657,4 +657,742 @@ curl -fsS http://127.0.0.1:8080/`,
 			},
 		],
 	},
+	{
+		slug: 'podman-quadlet-secrets-management',
+		path: '/podman-quadlet-secrets-management/',
+		navLabel: 'Secrets Management',
+		h1: 'Podman Quadlet Secrets Management and Encryption',
+		seoTitle: 'Podman Quadlet Secrets Guide & Unit Generator | QuadletGen',
+		metaDescription:
+			'Configure Podman Quadlet Secret directives, encrypted credential storage, and environment variable mounts without exposing plaintext passwords in unit files.',
+		primaryKeyword: 'podman quadlet secret',
+		heroSummary:
+			'Manage production container credentials securely using Podman Quadlet Secret directives. Map Compose secrets into Podman encrypted secret stores, configure Secret= mount and env targets, and eliminate plaintext passwords from systemd units.',
+		defaultInputMode: 'compose-yaml',
+		defaultTemplateId: 'quadlet-secrets',
+		defaultOptions: {
+			stackName: 'securestack',
+			installScope: 'rootless',
+			selinuxMode: 'none',
+			enableAutoUpdate: false,
+			generateSharedNetwork: true,
+			extractSecretsToEnvFile: true,
+		},
+		provenanceNote: provenance(
+			'Verified Secret directive syntax against Podman 5.8.10 specification for both type=mount and type=env targets in rootless user session storage.',
+		),
+		showGeneratedExample: true,
+		exampleLayout: 'split',
+		technicalNotes: [
+			'Podman provides podman secret create to store sensitive values in an encrypted local database rather than cleartext files.',
+			'Quadlet supports Secret= directives under [Container] with type=mount (mounting a file under /run/secrets/) or type=env (injecting as an environment variable).',
+			'Unlike EnvironmentFile= which reads a plaintext file on disk, Secret= pulls decrypted data in memory only when the container starts.',
+			'Rootless secrets live inside the user session storage under ~/.local/share/containers/storage/secrets/ and cannot be read by other unprivileged users.',
+		],
+		faqs: [
+			{
+				question: 'How does Secret= differ from EnvironmentFile=?',
+				answer:
+					'EnvironmentFile= reads a plaintext key-value file stored on the host filesystem. Secret= references an encrypted payload stored in Podman internal secret engine, injecting values into memory at runtime without creating unencrypted disk artifacts.',
+			},
+			{
+				question: 'How do I create a secret for Podman Quadlet on Linux?',
+				answer:
+					'Run printf "my-password" | podman secret create db_password - on the target host. For rootless units, execute the command without sudo so the secret is stored in your user storage database.',
+			},
+			{
+				question: 'Where does Podman mount secrets inside the container by default?',
+				answer:
+					'When using type=mount (or omitting type), Podman mounts the secret file under /run/secrets/<secret_name> inside the container namespace. Many official images like Postgres support reading passwords from files using POSTGRES_PASSWORD_FILE.',
+			},
+			{
+				question: 'Can a single secret be shared across multiple Quadlet container units?',
+				answer:
+					'Yes. Any container unit running under the same user session can reference the same secret name in its Secret= directive. Both an API service and a database service can read the same credential.',
+			},
+		],
+		guideSections: [
+			{
+				id: 'secrets-architecture',
+				eyebrow: 'Security Architecture',
+				heading: 'Why Hardcoded Passwords in systemd Units Create Security Debt',
+				paragraphs: [
+					'Storing plaintext passwords directly inside systemd unit files (such as Environment=POSTGRES_PASSWORD=secret) creates operational risks. Systemd unit files are frequently checked into Git repositories, mirrored across Ansible playbooks, and readable by any process inspecting systemctl show output.',
+					'Podman Quadlet supports native integration with the Podman secrets manager. By utilizing Secret= directives, sensitive values stay encrypted in local host storage and are presented to the container process only while active.',
+				],
+				bullets: [
+					'Keeps sensitive database passwords and API tokens out of version control systems.',
+					'Supports both file-based (/run/secrets/) and environment variable injection methods.',
+					'Isolates secrets per Linux user account in rootless mode.',
+				],
+			},
+			{
+				id: 'podman-secret-cli-workflow',
+				eyebrow: 'Credential Provisioning',
+				heading: 'Creating and Managing Podman Secrets with the CLI',
+				paragraphs: [
+					'Before starting a Quadlet unit that references a secret, the secret must be provisioned in the local Podman database. Administrators create secrets via standard input or from local files.',
+				],
+				codes: [
+					{
+						title: 'Provisioning rootless secrets via CLI',
+						code: `# Create secret from piped input
+printf "super-secret-password" | podman secret create db_password -
+
+# List existing secrets
+podman secret ls
+
+# Inspect secret metadata without revealing payload
+podman secret inspect db_password`,
+					},
+				],
+			},
+			{
+				id: 'secret-directive-syntax',
+				eyebrow: 'Syntax Reference',
+				heading: 'Mount vs Environment Secret Injection in Quadlet',
+				paragraphs: [
+					'Quadlet supports two primary modes for secret consumption inside the [Container] section: file mounts and environment variables.',
+					'The mount syntax Secret=db_password,target=my_secret mounts the plaintext value as a tmpfs file under /run/secrets/my_secret. The environment syntax Secret=db_password,type=env,target=DATABASE_PASSWORD exposes the secret value directly as an environment variable to the container process.',
+				],
+				codes: [
+					{
+						title: 'Quadlet Secret directive examples',
+						code: `[Container]
+Image=docker.io/library/postgres:16-alpine
+# Mount secret as file under /run/secrets/db_password
+Secret=db_password,type=mount,target=/run/secrets/db_password
+
+# Inject secret as an environment variable
+Secret=api_token,type=env,target=SERVICE_API_TOKEN`,
+					},
+				],
+			},
+		],
+		spotlightLinks: [
+			{
+				href: '/quadlet-depends-on-healthcheck/',
+				eyebrow: 'Health',
+				title: 'Quadlet depends_on healthcheck',
+				summary:
+					'Pair secure database credentials with Notify=healthy so web apps wait for database availability.',
+			},
+			{
+				href: '/rootless-quadlet-selinux-volume-generator/',
+				eyebrow: 'SELinux',
+				title: 'Rootless Quadlet SELinux Volume Generator',
+				summary:
+					'Ensure database storage mounts carry private :Z flags alongside secret credential management.',
+			},
+		],
+	},
+	{
+		slug: 'debug-podman-quadlet-systemd-errors',
+		path: '/debug-podman-quadlet-systemd-errors/',
+		navLabel: 'Debug Systemd Errors',
+		h1: 'Debugging Podman Quadlet systemd Unit Errors and Failures',
+		seoTitle: 'Debug Podman Quadlet systemd Errors | Diagnostic Guide',
+		metaDescription:
+			'Troubleshoot Podman Quadlet errors, generator syntax failures, systemctl reload warnings, and journalctl container crash logs step by step.',
+		primaryKeyword: 'how to debug podman quadlet',
+		heroSummary:
+			'Diagnose and resolve Podman Quadlet systemd unit errors across every stage of the lifecycle. Follow a structured 5-level troubleshooting tree from quadlet -dryrun syntax validation to journalctl log inspection and SELinux denial analysis.',
+		defaultInputMode: 'compose-yaml',
+		defaultTemplateId: 'debug-quadlet',
+		defaultOptions: {
+			stackName: 'troubleshoot',
+			installScope: 'rootless',
+			selinuxMode: 'none',
+			enableAutoUpdate: false,
+			generateSharedNetwork: true,
+			extractSecretsToEnvFile: false,
+		},
+		provenanceNote: provenance(
+			'Tested dryrun diagnostics with /usr/libexec/podman/quadlet -dryrun -user on Podman 5.8.10 under Fedora and Debian user sessions.',
+		),
+		showGeneratedExample: true,
+		exampleLayout: 'stacked',
+		technicalNotes: [
+			'Running /usr/libexec/podman/quadlet -dryrun -user prints the compiled systemd service definition and flags any unrecognized directives without touching systemd.',
+			'Compiled transient units are written into /run/user/$UID/systemd/generator/ and can be directly inspected for syntax and parameter mapping.',
+			'When a unit fails to start, journalctl --user -xeu <unit>.service reveals conmon exit codes, image pull failures, and port conflict errors.',
+			'SELinux Access Vector Cache (AVC) denials show up in ausearch -m avc -ts recent when host bind mounts lack required :z or :Z attributes.',
+		],
+		faqs: [
+			{
+				question: 'What does Unit not found mean after placing files in ~/.config/containers/systemd/?',
+				answer:
+					'Systemd has not compiled your Quadlet files into transient services yet. Run systemctl --user daemon-reload to invoke podman-system-generator. If it still fails, check file extensions (.container, not .service) and directory permissions.',
+			},
+			{
+				question: 'Where do compiled Quadlet service files live on the host filesystem?',
+				answer:
+					'For rootless units, transient generated files live in /run/user/$UID/systemd/generator/. For rootful units, they live in /run/systemd/generator/. You can cat these files to inspect the exact ExecStart podman run command.',
+			},
+			{
+				question: 'How can I test if a Quadlet file has valid syntax without restarting containers?',
+				answer:
+					'Run /usr/libexec/podman/quadlet -dryrun -user (or locate quadlet binary on your distro). It validates syntax, checks referenced files, and prints the generated service definition without restarting running containers.',
+			},
+			{
+				question: 'Why does journalctl show conmon exiting with status 125 or 127?',
+				answer:
+					'Exit code 125 indicates a container engine configuration failure, such as an invalid flag, non-existent image, or already bound port. Exit code 127 indicates that the executable specified in Exec= or Entrypoint= was not found inside the container image.',
+			},
+		],
+		guideSections: [
+			{
+				id: 'troubleshooting-tree',
+				eyebrow: 'Diagnostic Tree',
+				heading: 'The 5-Level Quadlet Troubleshooting Process',
+				paragraphs: [
+					'When a container fails to run under Quadlet, determining whether the issue stems from YAML parsing, Quadlet generator syntax, systemd execution, or container runtime failure is essential.',
+					'Follow this 5-level sequence: Level 1 validates unit syntax with quadlet -dryrun; Level 2 inspects generator output in /run/user/$UID/systemd/generator/; Level 3 checks systemctl status and daemon-reload output; Level 4 examines journalctl container runtime logs; Level 5 investigates SELinux denials using ausearch.',
+				],
+				bullets: [
+					'Level 1: Syntax preflight (quadlet -dryrun -user).',
+					'Level 2: Transient compilation check (/run/user/$UID/systemd/generator/).',
+					'Level 3: Unit registration (systemctl --user daemon-reload).',
+					'Level 4: Runtime output and crash analysis (journalctl --user -xeu <unit>).',
+					'Level 5: Host security denials (ausearch -m avc -ts recent).',
+				],
+			},
+			{
+				id: 'dryrun-and-transient-inspection',
+				eyebrow: 'Generator Inspection',
+				heading: 'Using quadlet -dryrun and Inspecting Transient Output',
+				paragraphs: [
+					'The podman-system-generator binary can be invoked manually in dry-run mode. This command parses all files in ~/.config/containers/systemd/ and outputs the compiled systemd units to stdout.',
+				],
+				codes: [
+					{
+						title: 'Validating Quadlet units with dryrun',
+						code: `/usr/libexec/podman/quadlet -dryrun -user`,
+					},
+					{
+						title: 'Inspecting compiled systemd service units',
+						code: `cat /run/user/$(id -u)/systemd/generator/troubleshoot-web.service`,
+					},
+				],
+			},
+			{
+				id: 'common-exit-codes',
+				eyebrow: 'Runtime Failures',
+				heading: 'Deciphering conmon Exit Codes and Port Conflicts',
+				paragraphs: [
+					'If systemctl status reports status=failed with an exit code, conmon captured an error during container execution. Exit 125 means Podman could not initialize the container (e.g. port already bound by another process or invalid volume path). Exit 137 indicates the container was terminated by the OOM killer due to exceeding memory limits.',
+				],
+			},
+		],
+		spotlightLinks: [
+			{
+				href: '/quadlet-not-starting-on-boot/',
+				eyebrow: 'Boot Issues',
+				title: 'Quadlet not starting on boot',
+				summary:
+					'Resolve user lingering and default.target configuration when services fail to start after reboot.',
+			},
+			{
+				href: '/about/',
+				eyebrow: 'Methodology',
+				title: 'QuadletGen Architecture and Dry-Run Guide',
+				summary:
+					'Review how QuadletGen synthesizes unit files and aligns with upstream Podman generator specifications.',
+			},
+		],
+	},
+	{
+		slug: 'traefik-podman-quadlet-reverse-proxy',
+		path: '/traefik-podman-quadlet-reverse-proxy/',
+		navLabel: 'Traefik Reverse Proxy',
+		h1: 'Traefik v3 Reverse Proxy on Rootless Podman Quadlet',
+		seoTitle: 'Traefik Podman Quadlet Reverse Proxy Guide | QuadletGen',
+		metaDescription:
+			'Deploy Traefik v3 reverse proxy on rootless Podman Quadlet with socket activation, Let\'s Encrypt SSL, and dynamic service discovery.',
+		primaryKeyword: 'traefik podman quadlet',
+		heroSummary:
+			'Deploy a production Traefik v3 reverse proxy using rootless Podman Quadlet units. Resolve rootless podman.sock permission issues, configure automatic Let\'s Encrypt certificates, and enable dynamic container routing without running Docker.',
+		defaultInputMode: 'compose-yaml',
+		defaultTemplateId: 'traefik-proxy',
+		defaultOptions: {
+			stackName: 'traefik',
+			installScope: 'rootless',
+			selinuxMode: 'none',
+			enableAutoUpdate: true,
+			generateSharedNetwork: true,
+			extractSecretsToEnvFile: false,
+		},
+		provenanceNote: provenance(
+			'Tested Traefik v3.1 socket connectivity with systemctl --user enable --now podman.socket on Podman 5.8.10.',
+		),
+		showGeneratedExample: true,
+		exampleLayout: 'stacked',
+		technicalNotes: [
+			'Rootless Podman provides a user socket at /run/user/$UID/podman/podman.sock managed via systemctl --user enable --now podman.socket.',
+			'Traefik connects to the Podman socket via docker.endpoint=unix:///run/podman/podman.sock when mapped into the Traefik container.',
+			'Setting SecurityLabelDisable=true on the Traefik unit prevents SELinux from blocking access to the user-mode Podman API socket.',
+			'Binding low ports 80 and 443 in rootless mode requires configuring net.ipv4.ip_unprivileged_port_start=80 via sysctl.',
+		],
+		faqs: [
+			{
+				question: 'How does Traefik connect to the rootless Podman socket?',
+				answer:
+					'Enable the user socket with systemctl --user enable --now podman.socket, then bind mount /run/user/$UID/podman/podman.sock:/var/run/docker.sock into Traefik. In Traefik configuration, set providers.docker.endpoint to unix:///var/run/docker.sock.',
+			},
+			{
+				question: 'Why does Traefik fail with permission denied on podman.sock?',
+				answer:
+					'On SELinux enforcing systems, container processes cannot access host sockets by default. Add SecurityLabelDisable=true under [Container] in traefik.container to disable container label confinement for the proxy.',
+			},
+			{
+				question: 'How does Traefik discover other Quadlet containers dynamically?',
+				answer:
+					'When downstream Quadlet units include Label="traefik.enable=true" and routing labels, Traefik reads those labels via the Podman socket API and dynamically creates HTTP routers and services.',
+			},
+			{
+				question: 'Can Traefik manage Let\'s Encrypt certificates when running in rootless Quadlet?',
+				answer:
+					'Yes. Mount a persistent volume to /letsencrypt inside the Traefik container to store acme.json. Ensure file permissions on acme.json are chmod 600.',
+			},
+		],
+		guideSections: [
+			{
+				id: 'traefik-podman-architecture',
+				eyebrow: 'Reverse Proxy Architecture',
+				heading: 'How Traefik Interfaces with Rootless Podman Socket',
+				paragraphs: [
+					'Traefik uses a Docker provider to discover running containers and build dynamic routing tables. Because Podman implements the Docker-compatible API, Traefik functions seamlessly with Podman when connected to the Podman socket.',
+					'In rootless mode, each user has a dedicated Podman API socket at /run/user/$UID/podman/podman.sock. Enabling systemctl --user enable --now podman.socket activates the socket listener, which spawns the API service on demand.',
+				],
+			},
+			{
+				id: 'socket-activation-and-selinux',
+				eyebrow: 'Permissions & Socket',
+				heading: 'Activating podman.socket and Disabling SELinux Socket Labeling',
+				paragraphs: [
+					'Binding the user socket into a container requires special consideration for SELinux. If SELinux confinement is active, the container cannot communicate over the Unix domain socket.',
+					'Adding SecurityLabelDisable=true to traefik.container allows Traefik to read container metadata without triggering AVC security denials.',
+				],
+				codes: [
+					{
+						title: 'Enabling rootless Podman socket',
+						code: `systemctl --user enable --now podman.socket
+ls -la /run/user/$(id -u)/podman/podman.sock`,
+					},
+					{
+						title: 'Traefik Quadlet unit socket configuration',
+						code: `[Container]
+Image=docker.io/library/traefik:v3.1
+Volume=/run/user/1000/podman/podman.sock:/var/run/docker.sock
+SecurityLabelDisable=true`,
+					},
+				],
+			},
+			{
+				id: 'dynamic-routing-labels',
+				eyebrow: 'Service Discovery',
+				heading: 'Configuring Traefik Labels in Downstream Quadlet Units',
+				paragraphs: [
+					'To route incoming web traffic to an application container, declare Traefik labels in the application .container unit file using Label= directives.',
+				],
+				codes: [
+					{
+						title: 'Downstream container Traefik labels',
+						code: `[Container]
+Image=docker.io/library/node:22-alpine
+Network=traefik.network
+Label=traefik.enable=true
+Label=traefik.http.routers.app.rule=Host("app.example.com")
+Label=traefik.http.services.app.loadbalancer.server.port=3000`,
+					},
+				],
+			},
+		],
+		spotlightLinks: [
+			{
+				href: '/immich-nextcloud-vaultwarden-quadlet-templates/',
+				eyebrow: 'Templates',
+				title: 'Self-Hosted Quadlet Templates',
+				summary:
+					'Deploy upstream applications behind your Traefik reverse proxy using shared networks.',
+			},
+			{
+				href: '/podman-pihole-quadlet/',
+				eyebrow: 'DNS Routing',
+				title: 'Podman Pi-hole Quadlet',
+				summary:
+					'Pair Traefik reverse proxy routing with local Pi-hole DNS overrides for homelab domains.',
+			},
+		],
+	},
+	{
+		slug: 'rootless-podman-quadlet-permissions-keep-id',
+		path: '/rootless-podman-quadlet-permissions-keep-id/',
+		navLabel: 'UID Mapping & keep-id',
+		h1: 'Rootless Podman Quadlet Permissions, UserNS, and keep-id',
+		seoTitle: 'Rootless Podman Quadlet Permissions & keep-id | QuadletGen',
+		metaDescription:
+			'Fix rootless Podman Quadlet volume permission denied errors using UserNS=keep-id, /etc/subuid mappings, and host UID/GID alignment.',
+		primaryKeyword: 'rootless podman userns keep-id quadlet',
+		heroSummary:
+			'Master user namespace mappings and file permissions in rootless Podman Quadlet containers. Eliminate permission denied errors on host bind mounts using UserNS=keep-id, understand /etc/subuid allocation, and match host and container user IDs.',
+		defaultInputMode: 'compose-yaml',
+		defaultTemplateId: 'rootless-permissions',
+		defaultOptions: {
+			stackName: 'appstack',
+			installScope: 'rootless',
+			selinuxMode: 'none',
+			enableAutoUpdate: false,
+			generateSharedNetwork: false,
+			extractSecretsToEnvFile: false,
+		},
+		provenanceNote: provenance(
+			'Tested UserNS=keep-id and keep-id:uid=1000,gid=1000 mappings on Podman 5.8.10 with subuid allocations.',
+		),
+		showGeneratedExample: true,
+		exampleLayout: 'split',
+		technicalNotes: [
+			'In rootless Podman, your host user (e.g. UID 1000) maps to container UID 0 by default, while subordinate IDs in /etc/subuid map higher container UIDs.',
+			'Setting UserNS=keep-id ensures that host UID 1000 maps directly to container UID 1000, allowing non-root container processes to read and write host files.',
+			'Podman 4.5+ supports UserNS=keep-id:uid=UID,gid=GID to map your host user to any specific container UID, such as 999 for Postgres or 10001 for Node.',
+			'When container processes write files without keep-id, files on the host appear owned by subordinate IDs (e.g. 100999) rather than your login user.',
+		],
+		faqs: [
+			{
+				question: 'Why does my container fail with Permission Denied on a host directory?',
+				answer:
+					'In rootless mode, container processes running as non-root (such as UID 1000 or UID 999) map to subordinate host UIDs allocated in /etc/subuid (e.g. UID 100999). If the host directory is owned by UID 1000, the container process lacks write permission.',
+			},
+			{
+				question: 'What does UserNS=keep-id do in a Quadlet .container unit?',
+				answer:
+					'UserNS=keep-id maps your host user ID directly to the same user ID inside the container user namespace. If your host user is UID 1000, container UID 1000 corresponds to your host user.',
+			},
+			{
+				question: 'How do I map my host UID to a specific non-root user like postgres (UID 999)?',
+				answer:
+					'Use UserNS=keep-id:uid=999,gid=999 in the [Container] section. This maps your host user to container UID 999, so Postgres can read and write files owned by your host user without permission errors.',
+			},
+			{
+				question: 'How does podman unshare help inspect and fix file ownership?',
+				answer:
+					'Running podman unshare opens a shell inside the user namespace. Inside this shell, your host user appears as root (UID 0), allowing you to chown files to subordinate container UIDs directly.',
+			},
+		],
+		guideSections: [
+			{
+				id: 'userns-fundamentals',
+				eyebrow: 'User Namespaces',
+				heading: 'How Subordinate UIDs Work in Rootless Podman',
+				paragraphs: [
+					'Linux user namespaces provide security by running container processes without root privileges on the host. When an unprivileged user (UID 1000) launches Podman, the host kernel maps UID 1000 to container UID 0 (root inside the container).',
+					'Additional container UIDs are mapped to subordinate IDs defined in /etc/subuid (for example, 65,536 IDs starting at 100000). Consequently, a process inside the container running as UID 1000 appears on the host as UID 100999.',
+				],
+			},
+			{
+				id: 'keep-id-deep-dive',
+				eyebrow: 'UID Alignment',
+				heading: 'Using UserNS=keep-id for Seamless Host Volume Access',
+				paragraphs: [
+					'When mounting host directories into containers, UID mismatches cause permission denied errors. Setting UserNS=keep-id alters the mapping so host UID 1000 becomes container UID 1000.',
+					'In modern Podman (version 4.5 and newer), you can specify custom target IDs like UserNS=keep-id:uid=999,gid=999. This allows database engines like PostgreSQL or MariaDB that run as UID 999 to write directly to directories owned by your host user.',
+				],
+				codes: [
+					{
+						title: 'Quadlet keep-id configuration options',
+						code: `[Container]
+Image=docker.io/library/node:22-alpine
+User=1000:1000
+UserNS=keep-id
+Volume=./data:/srv/app/data`,
+					},
+					{
+						title: 'Mapping host user to custom container UID',
+						code: `[Container]
+Image=docker.io/library/postgres:16-alpine
+UserNS=keep-id:uid=999,gid=999
+Volume=/srv/postgres/data:/var/lib/postgresql/data`,
+					},
+				],
+			},
+			{
+				id: 'podman-unshare-remediation',
+				eyebrow: 'Permission Remediation',
+				heading: 'Fixing Existing Directory Permissions with podman unshare',
+				paragraphs: [
+					'If a directory was created without keep-id, files may be owned by subordinate IDs that your regular host user cannot modify. Use podman unshare to modify permissions within the container namespace.',
+				],
+				codes: [
+					{
+						title: 'Remediating file ownership with podman unshare',
+						code: `# Enter user namespace and chown directory
+podman unshare chown -R 1000:1000 /srv/app/data
+podman unshare chmod -R u+rwX /srv/app/data`,
+					},
+				],
+			},
+		],
+		spotlightLinks: [
+			{
+				href: '/rootless-quadlet-selinux-volume-generator/',
+				eyebrow: 'SELinux Volumes',
+				title: 'Rootless Quadlet SELinux Volume Generator',
+				summary:
+					'Combine user namespace UID alignment with SELinux :z and :Z mount labeling.',
+			},
+			{
+				href: '/quadlet-not-starting-on-boot/',
+				eyebrow: 'Session Persistence',
+				title: 'Quadlet not starting on boot',
+				summary:
+					'Ensure rootless user systemd sessions persist after host reboots using loginctl linger.',
+			},
+		],
+	},
+	{
+		slug: 'systemd-quadlet-resource-limits-hardening',
+		path: '/systemd-quadlet-resource-limits-hardening/',
+		navLabel: 'Resource Limits & Hardening',
+		h1: 'Podman Quadlet Resource Limits and systemd Service Hardening',
+		seoTitle: 'Podman Quadlet Resource Limits & Hardening | QuadletGen',
+		metaDescription:
+			'Apply systemd cgroup v2 resource limits, CPUQuota, MemoryMax, and Linux security sandboxing directives to Podman Quadlet containers.',
+		primaryKeyword: 'podman quadlet memory limit',
+		heroSummary:
+			'Enforce granular resource boundaries and enterprise security sandboxing on Podman Quadlet containers. Configure systemd cgroup v2 directives like MemoryMax and CPUQuota alongside Linux isolation flags to protect the host system.',
+		defaultInputMode: 'compose-yaml',
+		defaultTemplateId: 'systemd-hardening',
+		defaultOptions: {
+			stackName: 'hardened',
+			installScope: 'rootless',
+			selinuxMode: 'none',
+			enableAutoUpdate: false,
+			generateSharedNetwork: false,
+			extractSecretsToEnvFile: false,
+		},
+		provenanceNote: provenance(
+			'Verified systemd cgroup v2 resource limits and sandboxing directives on Podman 5.8.10 with systemd 256.',
+		),
+		showGeneratedExample: true,
+		exampleLayout: 'split',
+		technicalNotes: [
+			'Quadlet units can include standard systemd [Service] directives such as MemoryMax=, MemoryHigh=, and CPUQuota= enforced via cgroup v2.',
+			'Setting MemoryHigh= provides proactive throttling and memory reclamation before the systemd OOM killer terminates the container on MemoryMax=.',
+			'Security directives like NoNewPrivileges=true, ProtectSystem=strict, and ProtectHome=read-only prevent escaped processes from altering the host.',
+			'Rootless containers enforce limits inside user-delegated cgroup controllers enabled via systemd user slice management.',
+		],
+		faqs: [
+			{
+				question: 'How do I limit container memory usage in a Quadlet unit?',
+				answer:
+					'Add MemoryMax=2G under the [Service] section in your .container unit. Systemd cgroup v2 enforces this ceiling. You can also add MemoryHigh=1.8G to trigger page cache throttling before hard limits.',
+			},
+			{
+				question: 'What happens when a Quadlet container exceeds MemoryMax=?',
+				answer:
+					'The systemd cgroup v2 out-of-memory killer terminates processes inside the container slice. The unit transitions to a failed state and restarts automatically if [Service] Restart=always is configured.',
+			},
+			{
+				question: 'Can I limit CPU cores or percentage using systemd directives?',
+				answer:
+					'Yes. Add CPUQuota=150% under [Service] to limit the container to 1.5 CPU cores of compute time. You can also set CPUWeight= to establish fair-share CPU distribution during peak contention.',
+			},
+			{
+				question: 'Which systemd security hardening directives are compatible with Quadlet?',
+				answer:
+					'Directives such as NoNewPrivileges=true, ProtectSystem=strict, ProtectHome=read-only, PrivateTmp=true, and CapabilityBoundingSet= work cleanly in Quadlet units, creating defense-in-depth isolation.',
+			},
+		],
+		guideSections: [
+			{
+				id: 'cgroupv2-resource-management',
+				eyebrow: 'cgroup v2 Architecture',
+				heading: 'Enforcing Memory and CPU Limits via systemd [Service] Directives',
+				paragraphs: [
+					'Unlike Docker which enforces resource limits through container runtime CLI flags, Podman Quadlet leverages Linux systemd native cgroup v2 tree directly. Because each Quadlet container is a systemd service, all standard [Service] resource control directives apply.',
+					'Setting MemoryMax=2G establishes a hard ceiling on memory consumption. CPUQuota=200% restricts the container to a maximum of two CPU cores across all worker threads, preventing runaway workloads from degrading neighboring services.',
+				],
+				codes: [
+					{
+						title: 'Resource limits under [Service] section',
+						code: `[Service]
+Restart=always
+MemoryHigh=1800M
+MemoryMax=2G
+CPUQuota=150%
+TasksMax=500`,
+					},
+				],
+			},
+			{
+				id: 'oom-killer-prevention',
+				eyebrow: 'Stability & OOM',
+				heading: 'Using MemoryHigh to Prevent Abrupt OOM-Killer Terminations',
+				paragraphs: [
+					'A major advantage of systemd cgroup v2 is two-stage memory throttling. If you only specify MemoryMax=, crossing the threshold triggers an immediate SIGKILL by the Linux OOM killer.',
+					'By defining MemoryHigh= below MemoryMax= (e.g. MemoryHigh=1800M with MemoryMax=2G), systemd proactively throttles the container processes and aggressively reclaims page cache memory, preventing unexpected service crashes.',
+				],
+			},
+			{
+				id: 'security-sandboxing-directives',
+				eyebrow: 'Host Defense',
+				heading: 'Sandboxing Containers with NoNewPrivileges and ProtectSystem',
+				paragraphs: [
+					'Quadlet units can include systemd security directives to enforce defense-in-depth isolation. Even if a vulnerability exists in the container payload, systemd restrictions prevent escalation.',
+				],
+				bullets: [
+					'NoNewPrivileges=true: Blocks setuid and setgid privilege escalation.',
+					'ProtectSystem=strict: Mounts /usr, /boot, /etc as read-only for the service.',
+					'ProtectHome=read-only: Prevents the container from writing to user home directories.',
+					'PrivateTmp=true: Isolates /tmp and /var/tmp in a private namespace.',
+				],
+			},
+		],
+		spotlightLinks: [
+			{
+				href: '/podman-quadlet-generator/',
+				eyebrow: 'Core Generator',
+				title: 'Podman Quadlet Generator',
+				summary:
+					'Generate foundational unit structures with AutoUpdate and restart supervision.',
+			},
+			{
+				href: '/docker-compose-to-podman-quadlet-migration-guide/',
+				eyebrow: 'Migration',
+				title: 'Docker Compose to Quadlet Migration Guide',
+				summary:
+					'Migrate enterprise Docker Compose resource limits into native systemd cgroups.',
+			},
+		],
+	},
+	{
+		slug: 'docker-compose-to-podman-quadlet-migration-guide',
+		path: '/docker-compose-to-podman-quadlet-migration-guide/',
+		navLabel: 'Migration Playbook',
+		h1: 'Docker Compose to Podman Quadlet Production Migration Guide',
+		seoTitle: 'Docker Compose to Podman Quadlet Migration Guide | QuadletGen',
+		metaDescription:
+			'Step-by-step production migration playbook from Docker Compose to Podman Quadlet: volume tar exports, network migration, and systemd automation.',
+		primaryKeyword: 'docker compose to podman quadlet migration',
+		heroSummary:
+			'Execute a smooth, zero-downtime migration from Docker Compose to Podman Quadlet systemd units. Learn how to export Docker named volumes into Podman storage, adapt restart policies into systemd targets, and automate deployments with Ansible.',
+		defaultInputMode: 'compose-yaml',
+		defaultTemplateId: 'migration-guide',
+		defaultOptions: {
+			stackName: 'production',
+			installScope: 'rootless',
+			selinuxMode: 'none',
+			enableAutoUpdate: true,
+			generateSharedNetwork: true,
+			extractSecretsToEnvFile: true,
+		},
+		provenanceNote: provenance(
+			'Tested volume tar export and import pipelines between Docker 27 and Podman 5.8.10 with Quadlet unit synthesis.',
+		),
+		showGeneratedExample: true,
+		exampleLayout: 'stacked',
+		technicalNotes: [
+			'Migrating from Docker to Podman eliminates the single point of failure represented by the central dockerd root daemon.',
+			'Docker named volumes can be exported via docker run --rm -v name:/data alpine tar czf - -C /data . | podman volume import name - to preserve data.',
+			'Docker Compose restart: always becomes systemd [Service] Restart=always and [Install] WantedBy=default.target under systemd management.',
+			'Ansible provides the official containers.podman.quadlet module to template and deploy Quadlet unit files across server fleets.',
+		],
+		faqs: [
+			{
+				question: 'How do I migrate data from Docker named volumes into Podman volumes?',
+				answer:
+					'Stop the Docker service to prevent writes, then pipe a tar stream between Docker and Podman: docker run --rm -v myvolume:/data alpine tar czf - -C /data . | podman volume import myvolume -. This preserves permissions and file timestamps.',
+			},
+			{
+				question: 'What is the recommended strategy for migrating a multi-container stack with minimal downtime?',
+				answer:
+					'Generate Quadlet units in advance using QuadletGen, test them on a staging host with /usr/libexec/podman/quadlet -dryrun, transfer volume snapshots, stop the Compose stack with docker compose down, reload systemd, and start the units.',
+			},
+			{
+				question: 'How does Quadlet handle Compose environment variable substitution?',
+				answer:
+					'Quadlet unit files do not evaluate shell variables like ${PORT:-8080} dynamically. QuadletGen resolves default values during conversion and writes fixed values or moves secrets to an .env file referenced via EnvironmentFile=.',
+			},
+			{
+				question: 'How do I manage and update Quadlet units across multiple servers automatically?',
+				answer:
+					'Use Ansible with the containers.podman.quadlet module or manage unit files in a Git repository deployed with systemd timers or CI/CD pipelines via SSH.',
+			},
+		],
+		guideSections: [
+			{
+				id: 'daemonless-paradigm-shift',
+				eyebrow: 'Architectural Comparison',
+				heading: 'Why Enterprises Migrate from Docker Compose to Podman Quadlet',
+				paragraphs: [
+					'Docker Compose was designed as a developer convenience tool for running multi-container stacks against a local Docker engine. In production Linux environments, running services under a root daemon introduces maintenance friction during daemon upgrades and conflicts with systemd init systems.',
+					'Podman Quadlet bridges this gap by translating declarative container specifications into native systemd units. Each container runs as an independent Linux system service with native logging, resource quotas, and boot management.',
+				],
+				bullets: [
+					'No daemon restarts disrupting all running containers.',
+					'Native integration with systemctl status, stop, start, and journalctl.',
+					'Rootless security model preventing container escapes from gaining root host privileges.',
+				],
+			},
+			{
+				id: 'step-by-step-data-migration',
+				eyebrow: 'Volume Migration',
+				heading: 'Exporting Docker Named Volumes and Importing into Podman',
+				paragraphs: [
+					'State preservation is the most critical phase of migration. Host bind mounts can simply be repointed to the new unit paths. Named Docker volumes, however, reside in /var/lib/docker/volumes/ and must be exported cleanly.',
+				],
+				codes: [
+					{
+						title: 'Streaming Docker volume data into Podman',
+						code: `# Stop Docker stack to ensure data consistency
+docker compose stop
+
+# Pipe tar archive directly from Docker to Podman
+docker run --rm -v myapp_data:/source:ro alpine tar -C /source -czf - . | \\
+  podman volume import myapp_data -
+
+# Verify imported Podman volume contents
+podman volume ls
+podman run --rm -v myapp_data:/data:ro alpine ls -la /data`,
+					},
+				],
+			},
+			{
+				id: 'ansible-and-gitops-automation',
+				eyebrow: 'Fleet Automation',
+				heading: 'Automating Quadlet Deployments with Ansible and GitOps',
+				paragraphs: [
+					'Because Quadlet files are simple text files, they integrate cleanly into GitOps workflows. The containers.podman Ansible collection includes dedicated modules for deploying Quadlet units and triggering daemon-reload across entire server fleets.',
+				],
+				codes: [
+					{
+						title: 'Ansible task for deploying Quadlet units',
+						code: `- name: Deploy Quadlet container unit
+  containers.podman.podman_quadlet:
+    state: present
+    name: webapp
+    unit_type: container
+    scope: user
+    src: templates/webapp.container.j2`,
+					},
+				],
+			},
+		],
+		spotlightLinks: [
+			{
+				href: '/quadlet-vs-docker-compose/',
+				eyebrow: 'Comparison',
+				title: 'Quadlet vs Docker Compose Comparison',
+				summary:
+					'Review side-by-side directive mappings and syntax contrasts for production workloads.',
+			},
+			{
+				href: '/podlet-online-multi-container-network-packager/',
+				eyebrow: 'Packager',
+				title: 'Podlet Online Multi-Container Packager',
+				summary:
+					'Package your migrated Compose stack into a downloadable systemd deployment ZIP.',
+			},
+		],
+	},
 ];

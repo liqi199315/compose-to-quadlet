@@ -26,6 +26,12 @@ QuadletGen (`https://quadletgen.com`) converts `compose.yaml` service stacks and
 - [Podman Pi-hole Quadlet](https://quadletgen.com/podman-pihole-quadlet/): Rootless Pi-hole DNS on port 53 with `ip_unprivileged_port_start` and listening mode `ALL`.
 - [Jellyfin Podman Quadlet](https://quadletgen.com/jellyfin-podman-quadlet/): Jellyfin docker run template with `/dev/dri`, `GroupAdd=keep-groups`, and SELinux notes.
 - [Quadlet vs Docker Compose](https://quadletgen.com/quadlet-vs-docker-compose/): Side-by-side conversion of one Caddy and whoami stack, with links to the other guides.
+- [Podman Quadlet Secrets Management](https://quadletgen.com/podman-quadlet-secrets-management/): Configure Secret directives, encrypted credential storage, and environment variable mounts.
+- [Debug Podman Quadlet systemd Errors](https://quadletgen.com/debug-podman-quadlet-systemd-errors/): Troubleshoot Quadlet errors, generator syntax failures, and journalctl crash logs.
+- [Traefik Podman Quadlet Reverse Proxy](https://quadletgen.com/traefik-podman-quadlet-reverse-proxy/): Deploy Traefik v3 reverse proxy with socket activation, SSL, and service discovery.
+- [Rootless Podman Quadlet Permissions and keep-id](https://quadletgen.com/rootless-podman-quadlet-permissions-keep-id/): Fix volume permission denied errors with UserNS=keep-id and subuid mappings.
+- [Systemd Quadlet Resource Limits and Hardening](https://quadletgen.com/systemd-quadlet-resource-limits-hardening/): Apply cgroup v2 resource limits, CPUQuota, MemoryMax, and security sandboxing.
+- [Docker Compose to Podman Quadlet Migration Guide](https://quadletgen.com/docker-compose-to-podman-quadlet-migration-guide/): Step-by-step production migration playbook with volume tar exports and Ansible automation.
 
 ## Project and Policies
 
