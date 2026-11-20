@@ -26,7 +26,7 @@
 
 - **多模式转换引擎与类型契约（`src/lib/`）**：支持 `compose-yaml` 与 `docker-run` / `podman-run` 输入解析，`rootless` / `rootful` 安装目录切换，`none` / `shared-z` / `private-Z` SELinux 卷重打标，自动合成共享 `.network` 单元解决容器间 DNS 解析（`podlet#190`），敏感环境变量分离至 `.env`，以及纯前端 PKZIP 归档打包。
 - **`depends_on.condition` 映射与跳过清单（2026-11-15）**：数组形式与 `service_started` 只生成启动顺序（`After=` + `Requires=`，`required: false` 时为 `Wants=`）。`service_healthy` 仅在依赖项有可用 `healthcheck.test` 时给依赖单元加 `Notify=healthy`；没有健康检查、`service_completed_successfully`、未知或非法 condition、缺失依赖目标、非法 `depends_on` 形态都会带稳定 `code` 与 `impact: skipped/degraded`。这些条目同时显示在工作台 `dependency-skip-list`，并写入 ZIP 内 `README.txt`。同一依赖被 `service_started` 与 `service_healthy` 混用时按 degraded 提示 `Notify=healthy` 更严格。
-- **20 个静态内容路由（17 个工具页 + 3 个 E-E-A-T 信任与合规页）**：
+- **21 个静态内容路由（18 个工具页 + 3 个 E-E-A-T 信任与合规页）**：
   1. `/`（Docker Compose to Quadlet 主工作台）
   2. `/podman-quadlet-generator/`（Podman Quadlet 生成器与 AutoUpdate 预设）
   3. `/docker-run-to-quadlet-converter/`（Docker Run / Podman Run 转 Quadlet 转换器）
@@ -44,9 +44,10 @@
   15. `/rootless-podman-quadlet-permissions-keep-id/`（Rootless 卷权限、UserNS=keep-id 与 subuid 映射）
   16. `/systemd-quadlet-resource-limits-hardening/`（cgroup v2 资源限额 MemoryMax/CPUQuota 与服务安全沙箱）
   17. `/docker-compose-to-podman-quadlet-migration-guide/`（生产迁移白皮书、卷 tar 流式迁移与 Ansible 自动化）
-  18. `/about/`（Podman 4.4+/5.x `podman-system-generator` 规范对齐说明、共享 `.network` 解决 `podlet#190` 跨容器 DNS 原理、100% 本地内存运行架构、非官方声明与 `hello@quadletgen.com` 联系入口）
-  19. `/privacy/`（`docker-compose.yml` 与密钥零上传承诺、匿名化 GA4 事件策略、GDPR 与 CCPA/CPRA 权利说明）
-  20. `/terms/`（MIT 开源使用条款、上线前测试环境审查 systemd 单元与 SELinux 标签的操作员责任、Linux VPS `rel="sponsored"` 联盟披露规范）
+  18. `/docker-compose-volumes-to-quadlet/`（Compose volumes 短语法与长语法到 Volume= 和 .volume）
+  19. `/about/`（Podman 4.4+/5.x `podman-system-generator` 规范对齐说明、共享 `.network` 解决 `podlet#190` 跨容器 DNS 原理、100% 本地内存运行架构、非官方声明与 `hello@quadletgen.com` 联系入口）
+  20. `/privacy/`（`docker-compose.yml` 与密钥零上传承诺、匿名化 GA4 事件策略、GDPR 与 CCPA/CPRA 权利说明）
+  21. `/terms/`（MIT 开源使用条款、上线前测试环境审查 systemd 单元与 SELinux 标签的操作员责任、Linux VPS `rel="sponsored"` 联盟披露规范）
 - **全套技术 SEO 与安全静态产物**：站点图标（`favicon.svg`、`favicon-32.png`、`icon-192.png`、`icon-512.png`、`apple-touch-icon.png`，PWA manifest 与结构化数据 logo 已引用）、`404.html`、`sitemap-index.xml`、`robots.txt`、`llms.txt`、`_headers`（含 `workers.dev` 与 `pages.dev` 预览域名 `X-Robots-Tag: noindex` 防串台头）、`og-image.svg`、`og-image.png`（1200x630 栅格化社交浏览卡片）、`github-social-preview.png`（1280x640 GitHub 社交预览卡片）、`site.webmanifest`、`indexnow-key.txt` 以及 `c9d2e4f73a814b629d4c35e8f2a16c53.txt` 双重 IndexNow 探测校验文件。
 - **独立 Node ESM CLI 与完整测试套件（`bin/compose-to-quadlet.mjs`、`tests/cli.test.ts`）**：通过 esbuild 独立打包 `src/cli.ts`，支持 `--input`、`--run`、`--stack`、`--scope`、`--selinux`、`--out-dir`、`--stdout`、`--zip` 与 `--help`（指向 `https://quadletgen.com`），并通过 Vitest 11 项端到端 CLI 测试覆盖。
 - **全套发布工具包（`LAUNCH_KIT.md`）与 GitHub 准产 `README.md`**：包含 X 25 秒视频分镜与发帖话术、3 条布尔痛点搜索词与价值优先回复模板、Hacker News Show HN 事实备忘、Reddit（r/podman、r/selfhosted、r/linuxadmin）发帖模板、Console.dev 投稿草案及 upstream podlet#190 技术规避评论模版。

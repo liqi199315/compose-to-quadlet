@@ -610,6 +610,7 @@ describe('SAMPLE_TEMPLATES and buildZipArchive', () => {
 			'rootless-permissions',
 			'systemd-hardening',
 			'migration-guide',
+			'volumes-syntax-demo',
 		];
 
 		expect(Object.keys(SAMPLE_TEMPLATES).sort()).toEqual([...expectedIds].sort());
@@ -643,6 +644,32 @@ describe('SAMPLE_TEMPLATES and buildZipArchive', () => {
 				expect(containerWithVolume.content).toContain(':Z');
 			}
 		}
+	});
+
+	it('maps the volumes syntax sample to Volume= lines and one .volume unit', () => {
+		const tpl = SAMPLE_TEMPLATES['volumes-syntax-demo'];
+		const res = convertToQuadlet(tpl.content, {
+			stackName: tpl.stackName,
+			installScope: 'rootless',
+			selinuxMode: 'none',
+			enableAutoUpdate: false,
+			generateSharedNetwork: true,
+			extractSecretsToEnvFile: true,
+		});
+		expect(res.ok).toBe(true);
+		if (!res.ok) return;
+		const db = res.files.find((file) => file.filename === 'db.container');
+		expect(db?.content).toContain('Volume=pgdata.volume:/var/lib/postgresql/data');
+		expect(db?.content).toContain('Volume=/srv/compose-demo/config:/etc/postgres/conf.d:ro');
+		expect(db?.content).toContain('Volume=/srv/compose-demo/private:/var/lib/private:Z');
+		expect(db?.content).toContain('Volume=/srv/compose-demo/init:/docker-entrypoint-initdb.d:ro');
+		expect(db?.content).not.toContain('init:/docker-entrypoint-initdb.d:ro,z');
+		const vol = res.files.find((file) => file.filename === 'pgdata.volume');
+		expect(vol?.content).toContain('VolumeName=pgdata');
+		expect(res.files.some((file) => file.filename === 'external-archive.volume')).toBe(false);
+		const web = res.files.find((file) => file.filename === 'web.container');
+		expect(web?.content).toContain('Volume=external-archive:/usr/share/nginx/archive:ro');
+		expect(res.warnings).toEqual([]);
 	});
 
 	it('computes standard IEEE 802.3 CRC32 checksums accurately', () => {

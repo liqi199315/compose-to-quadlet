@@ -32,6 +32,7 @@ QuadletGen (`https://quadletgen.com`) converts `compose.yaml` service stacks and
 - [Rootless Podman Quadlet Permissions and keep-id](https://quadletgen.com/rootless-podman-quadlet-permissions-keep-id/): Fix volume permission denied errors with UserNS=keep-id and subuid mappings.
 - [Systemd Quadlet Resource Limits and Hardening](https://quadletgen.com/systemd-quadlet-resource-limits-hardening/): Apply cgroup v2 resource limits, CPUQuota, MemoryMax, and security sandboxing.
 - [Docker Compose to Podman Quadlet Migration Guide](https://quadletgen.com/docker-compose-to-podman-quadlet-migration-guide/): Step-by-step production migration playbook with volume tar exports and Ansible automation.
+- [Docker Compose Volumes Syntax to Quadlet](https://quadletgen.com/docker-compose-volumes-to-quadlet/): Named volumes, bind mounts, short and long form, :ro, :z, and :Z mapped to Volume= and .volume units.
 
 ## Project and Policies
 

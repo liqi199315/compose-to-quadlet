@@ -14,7 +14,7 @@ Read these four files in order at the start of every session before changing cod
 - **Brand and canonical site URL.** `QuadletGen` at `https://quadletgen.com` (`PUBLIC_SITE_URL` override supported; contact `hello@quadletgen.com`).
 - **Workspace stage.** Formal independent product repository in `/Users/dake/Projects/aiapp/30_products/compose-to-quadlet/`.
 - **Tech stack.** Astro 5 (`output: 'static'`, `trailingSlash: 'always'`, `build.format: 'directory'`), Tailwind CSS v4, TypeScript (`astro/tsconfigs/strict`), Vitest, Playwright, and Cloudflare Workers Static Assets (`wrangler.jsonc`).
-- **Twenty indexed content routes.** Seventeen converter workbench routes (`WebApplication` + `FAQPage` + `Organization` + `BreadcrumbList` JSON-LD) and three E-E-A-T trust routes (`Organization` + `BreadcrumbList` JSON-LD):
+- **Twenty-one indexed content routes.** Eighteen converter workbench routes (`WebApplication` + `FAQPage` + `Organization` + `BreadcrumbList` JSON-LD) and three E-E-A-T trust routes (`Organization` + `BreadcrumbList` JSON-LD):
 	- `/` (`dist/index.html`)
 	- `/podman-quadlet-generator/` (`dist/podman-quadlet-generator/index.html`)
 	- `/docker-run-to-quadlet-converter/` (`dist/docker-run-to-quadlet-converter/index.html`)
@@ -32,6 +32,7 @@ Read these four files in order at the start of every session before changing cod
 	- `/rootless-podman-quadlet-permissions-keep-id/` (`dist/rootless-podman-quadlet-permissions-keep-id/index.html`)
 	- `/systemd-quadlet-resource-limits-hardening/` (`dist/systemd-quadlet-resource-limits-hardening/index.html`)
 	- `/docker-compose-to-podman-quadlet-migration-guide/` (`dist/docker-compose-to-podman-quadlet-migration-guide/index.html`)
+	- `/docker-compose-volumes-to-quadlet/` (`dist/docker-compose-volumes-to-quadlet/index.html`)
 	- `/about/` (`dist/about/index.html`)
 	- `/privacy/` (`dist/privacy/index.html`)
 	- `/terms/` (`dist/terms/index.html`)

@@ -57,7 +57,8 @@ export type SampleTemplateId =
 	| 'traefik-proxy'
 	| 'rootless-permissions'
 	| 'systemd-hardening'
-	| 'migration-guide';
+	| 'migration-guide'
+	| 'volumes-syntax-demo';
 
 export interface GuideCodeBlock {
 	title: string;

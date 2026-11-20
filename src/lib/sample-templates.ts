@@ -452,4 +452,31 @@ volumes:
   app-storage:
 `,
 	},
+	'volumes-syntax-demo': {
+		label: 'Compose volume syntax: named, bind, and long form',
+		stackName: 'volumes',
+		mode: 'compose-yaml',
+		content: `services:
+  db:
+    image: docker.io/library/postgres:16
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - /srv/compose-demo/config:/etc/postgres/conf.d:ro
+      - /srv/compose-demo/private:/var/lib/private:Z
+      - type: bind
+        source: /srv/compose-demo/init
+        target: /docker-entrypoint-initdb.d
+        read_only: true
+    restart: unless-stopped
+  web:
+    image: docker.io/library/nginx:1.27
+    volumes:
+      - external-archive:/usr/share/nginx/archive:ro
+    restart: unless-stopped
+volumes:
+  pgdata:
+  external-archive:
+    external: true
+`,
+	},
 };
