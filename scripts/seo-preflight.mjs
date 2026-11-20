@@ -108,6 +108,12 @@ export const CONTENT_ROUTES = [
 		isToolRoute: true,
 	},
 	{
+		route: '/docker-compose-volumes-to-quadlet/',
+		file: 'docker-compose-volumes-to-quadlet/index.html',
+		canonical: `${SITE_ORIGIN}/docker-compose-volumes-to-quadlet/`,
+		isToolRoute: true,
+	},
+	{
 		route: '/about/',
 		file: 'about/index.html',
 		canonical: `${SITE_ORIGIN}/about/`,

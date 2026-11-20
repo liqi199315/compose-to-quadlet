@@ -411,15 +411,24 @@ AddDevice=/dev/dri`,
 					'Storing passwords in ~/.config/containers/systemd/<stack>.env with chmod 600 keeps plaintext database credentials out of unit files that you may commit to a dotfiles or Ansible repository.',
 			},
 		],
+		spotlightLinks: [
+			{
+				href: '/docker-compose-volumes-to-quadlet/',
+				eyebrow: 'Volume syntax',
+				title: 'Docker Compose volumes syntax and Quadlet Volume=',
+				summary:
+					'Named volumes, bind mounts, :ro, :z, and :Z, and which of those QuadletGen writes as Volume= or a .volume unit.',
+			},
+		],
 	},
 	{
 		slug: 'immich-nextcloud-vaultwarden-quadlet-templates',
 		path: '/immich-nextcloud-vaultwarden-quadlet-templates/',
 		navLabel: 'Self-Hosted Templates',
-		h1: 'Podman Quadlet Examples for Immich, Nextcloud, and Vaultwarden',
-		seoTitle: 'Podman Quadlet Docker Compose Examples | Self-Hosted Apps',
+		h1: 'Podman Quadlet Templates for Immich, Nextcloud, and Vaultwarden',
+		seoTitle: 'Immich, Nextcloud & Vaultwarden Podman Quadlet Templates',
 		metaDescription:
-			'Ready-to-deploy Podman Quadlet Docker Compose examples for Immich, Nextcloud, Vaultwarden, and Postgres stacks with shared DNS networks and volumes.',
+			'Podman Quadlet templates for Immich, Nextcloud, and Vaultwarden. Load a stack, adjust volumes and secrets, and download the .container, .network, and .volume units.',
 		primaryKeyword: 'podman quadlet docker compose examples',
 		heroSummary:
 			'Start from curated multi-container Compose definitions for Immich, Nextcloud with MariaDB, Vaultwarden with Caddy, or Node with PostgreSQL and Redis. Adjust stack names, SELinux volume flags, and secret extraction in real time to inspect complete Quadlet unit sets.',
@@ -507,10 +516,10 @@ immich-server             -> Storage: /srv/photos (bind mount)`,
 		slug: 'podlet-online-multi-container-network-packager',
 		path: '/podlet-online-multi-container-network-packager/',
 		navLabel: 'Podlet Online Packager',
-		h1: 'Podlet Online Multi-Container Quadlet Network and ZIP Packager',
-		seoTitle: 'Podlet Online Multi-Container Quadlet & ZIP Unit Packager',
+		h1: 'Browser Podlet Alternative for Multi-Container Quadlet Stacks',
+		seoTitle: 'Podlet Online Alternative | Shared Network + ZIP Export',
 		metaDescription:
-			'Run a Podlet online workflow in your browser without Cargo or Rust. Package Compose stacks into linked .container, .network, .volume, and .env ZIPs.',
+			'Convert a multi-container Compose stack to Quadlet in your browser, no Rust or Cargo. One shared .network keeps service DNS working. Download it all as a ZIP.',
 		primaryKeyword: 'podlet online',
 		heroSummary:
 			'Convert complete multi-container Compose stacks into linked Quadlet bundles right in your browser without installing Rust, Cargo, or local container engines. Automatically generate shared .network units, split secrets into .env files, and export a single <stack>-quadlet.zip package.',
@@ -691,6 +700,7 @@ const PRESET_BADGE_MAP: Record<string, string> = {
 	'rootless-podman-quadlet-permissions-keep-id': 'UID Mapping & keep-id',
 	'systemd-quadlet-resource-limits-hardening': 'Resource Limits & Hardening',
 	'docker-compose-to-podman-quadlet-migration-guide': 'Migration Playbook',
+	'docker-compose-volumes-to-quadlet': 'Volume Syntax',
 };
 
 export function getRelatedGuideCards(currentPath: string): RelatedGuideCard[] {

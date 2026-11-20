@@ -222,6 +222,7 @@ test.describe('Compose to Quadlet converter journeys', () => {
 			{ path: '/rootless-podman-quadlet-permissions-keep-id/', output: '[Container]' },
 			{ path: '/systemd-quadlet-resource-limits-hardening/', output: '[Container]' },
 			{ path: '/docker-compose-to-podman-quadlet-migration-guide/', output: '[Container]' },
+			{ path: '/docker-compose-volumes-to-quadlet/', output: 'Volume=pgdata.volume:/var/lib/postgresql/data' },
 		];
 
 		for (const route of routes) {

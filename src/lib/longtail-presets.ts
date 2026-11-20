@@ -1393,6 +1393,197 @@ podman run --rm -v myapp_data:/data:ro alpine ls -la /data`,
 				summary:
 					'Package your migrated Compose stack into a downloadable systemd deployment ZIP.',
 			},
+			{
+				href: '/docker-compose-volumes-to-quadlet/',
+				eyebrow: 'Volume syntax',
+				title: 'Docker Compose volumes syntax and Quadlet Volume=',
+				summary:
+					'Named volumes, bind mounts, :ro, :z, and :Z, and which of those QuadletGen writes as Volume= or a .volume unit.',
+			},
+		],
+	},
+	{
+		slug: 'docker-compose-volumes-to-quadlet',
+		path: '/docker-compose-volumes-to-quadlet/',
+		navLabel: 'Volume Syntax',
+		h1: 'Docker Compose Volumes Syntax and the Quadlet Volume= Equivalent',
+		seoTitle: 'Docker Compose Volumes Syntax to Quadlet Volume= Mapping',
+		metaDescription:
+			'Docker Compose volumes syntax explained: named volumes, bind mounts, short and long form, :ro, :z, :Z, and how each maps to Quadlet Volume= and .volume units.',
+		primaryKeyword: 'docker compose volumes syntax',
+		heroSummary:
+			'Docker Compose volumes syntax is a short string SOURCE:TARGET[:MODE] or a long mapping with type, source, target, and read_only. QuadletGen turns a named volume into Volume=<name>.volume:<target> plus a .volume unit whose VolumeName= is the Compose name, and it copies a bind mount path through as Volume=<path>:<target>:<mode>. Load the sample, then copy the units or download the ZIP. Nothing is uploaded.',
+		defaultInputMode: 'compose-yaml',
+		defaultTemplateId: 'volumes-syntax-demo',
+		defaultOptions: {
+			stackName: 'volumes',
+			installScope: 'rootless',
+			selinuxMode: 'none',
+			enableAutoUpdate: false,
+			generateSharedNetwork: true,
+			extractSecretsToEnvFile: true,
+		},
+		provenanceNote:
+			'With SELinux mode none, the loaded sample makes db.container contain Volume=pgdata.volume:/var/lib/postgresql/data, Volume=/srv/compose-demo/config:/etc/postgres/conf.d:ro, Volume=/srv/compose-demo/private:/var/lib/private:Z, and Volume=/srv/compose-demo/init:/docker-entrypoint-initdb.d:ro. pgdata.volume contains VolumeName=pgdata. web.container contains Volume=external-archive:/usr/share/nginx/archive:ro and there is no external-archive.volume file. QuadletGen does not read long-form bind.selinux. This sample emits no warning. These lines come from QuadletGen\'s converter, not from a live Podman host. Dry-run the installed files with /usr/libexec/podman/quadlet --dryrun --user before you start them.',
+		showGeneratedExample: true,
+		exampleLayout: 'stacked',
+		technicalNotes: [
+			'Short syntax is split on the first two colons only. SOURCE:TARGET has no mode. SOURCE:TARGET:ro,z keeps both options. A string with no colon is an anonymous mount and becomes Volume=<target> with no source.',
+			'A source is a named volume when it has no slash or backslash and does not start with ., ~, %, or $. Every non-external name, including one declared only under a service, gets a .volume unit. Volume= then points at <name>.volume, not at a host path.',
+			'Top-level volumes: <name>: external: true is the only key QuadletGen reads there. That name is not given a .volume unit. A service that mounts it gets Volume=<name>:<target> so you can point at a volume you already created. driver, driver_opts, name, and labels are ignored and do not add a warning.',
+			'Long syntax uses type, source, target, and read_only. read_only: true becomes the ro option. type: tmpfs becomes Tmpfs=<target> and drops every other key. bind.selinux, bind.propagation, and volume options are not read. The SELinux dropdown appends z or Z only when the option list does not already contain z or Z. It does not replace an existing suffix.',
+		],
+		faqs: [
+			{
+				question: 'How does Docker Compose volumes short syntax map to Quadlet Volume=?',
+				answer:
+					'SOURCE:TARGET becomes Volume=SOURCE:TARGET. A third colon starts the mode list, split on commas, so /srv/data:/data:ro,Z becomes Volume=/srv/data:/data:ro,Z. A named SOURCE such as pgdata becomes Volume=pgdata.volume:/var/lib/postgresql/data and a pgdata.volume file with VolumeName=pgdata.',
+			},
+			{
+				question: 'What is the difference between a Compose named volume and a bind mount in Quadlet?',
+				answer:
+					'A named volume is a Compose name with no path separator. QuadletGen writes a .volume unit and references it as name.volume in Volume=. A bind mount source contains a slash, or starts with . or ~, and is copied into Volume= unchanged. A relative source such as ./html is not rewritten to an absolute path.',
+			},
+			{
+				question: 'Does external: true or bind.selinux get a Quadlet key?',
+				answer:
+					'No. external: true skips the .volume unit and leaves the Compose name as the Volume= source. QuadletGen does not read long-form bind.selinux and does not warn when that key is present. Use the :z or :Z suffix in short syntax, or the SELinux dropdown, which appends z for shared-z and Z for private-Z only when neither letter is already present.',
+			},
+			{
+				question: 'Which Compose volume keys does QuadletGen skip?',
+				answer:
+					'It does not read driver, driver_opts, the volume name field, labels, bind.propagation, volume options, or create_host_path, and the sample produces an empty warning list. Long-form tmpfs keeps only the target as Tmpfs=. QuadletGen does not claim those keys match Podman. Check the units on the host with /usr/libexec/podman/quadlet --dryrun --user.',
+			},
+		],
+		guideSections: [
+			{
+				id: 'compose-volumes-reference',
+				eyebrow: 'Compose reference',
+				heading: 'Docker Compose volumes syntax reference',
+				paragraphs: [
+					'Short syntax is VOLUME:CONTAINER_PATH or VOLUME:CONTAINER_PATH:ACCESS_MODE. ACCESS_MODE is a comma-separated list. The modes this page covers are rw, ro, z, and Z. rw is read-write. ro is read-only. z is a shared SELinux label. Z is a private SELinux label.',
+					'Long syntax is a mapping. type is volume, bind, tmpfs, npipe, or cluster. The other keys are source, target, and read_only, plus bind.propagation, bind.create_host_path, bind.selinux, volume.nocopy, volume.subpath, tmpfs.size, and tmpfs.mode. A top-level volumes entry can set driver, driver_opts, external, labels, and name.',
+					'QuadletGen reads type, source, target, read_only, and external. A tmpfs mount keeps only target. The other keys above are ignored, and the converter does not add a warning for them.',
+				],
+				codes: [
+					{
+						title: 'Short form, long form, and top-level volumes',
+						code: `# compose.yaml
+services:
+  db:
+    image: docker.io/library/postgres:16
+    volumes:
+      # short: VOLUME:CONTAINER_PATH[:ACCESS_MODE]
+      - pgdata:/var/lib/postgresql/data
+      - /srv/compose-demo/config:/etc/postgres/conf.d:ro
+      # long: type, source, target, read_only, bind.*, volume.*, tmpfs.*
+      - type: bind
+        source: /srv/compose-demo/init
+        target: /docker-entrypoint-initdb.d
+        read_only: true
+volumes:
+  # top-level: driver, driver_opts, external, labels, name
+  pgdata:
+  external-archive:
+    external: true`,
+					},
+				],
+			},
+			{
+				id: 'short-vs-long',
+				eyebrow: 'Syntax',
+				heading: 'Short SOURCE:TARGET[:MODE] and the long type/source/target form',
+				paragraphs: [
+					'Docker Compose volumes syntax has two shapes. The short string is SOURCE:TARGET or SOURCE:TARGET:MODE. MODE is a comma list. :ro is read-only. :z is a shared SELinux label. :Z is a private SELinux label. The long form is a mapping. The keys QuadletGen uses are type, source, target, and read_only.',
+					'On the loaded sample the long bind sets read_only: true. The generated line is Volume=/srv/compose-demo/init:/docker-entrypoint-initdb.d:ro. The short bind /srv/compose-demo/config:/etc/postgres/conf.d:ro keeps :ro, and /srv/compose-demo/private:/var/lib/private:Z keeps :Z. QuadletGen does not read long-form bind.selinux. Use :z or :Z in short syntax, or the SELinux select, instead.',
+				],
+				codes: [
+					{
+						title: 'Same mount, short form and long form',
+						code: `# short
+- /srv/compose-demo/init:/docker-entrypoint-initdb.d:ro
+
+# long
+- type: bind
+  source: /srv/compose-demo/init
+  target: /docker-entrypoint-initdb.d
+  read_only: true
+
+# both become
+Volume=/srv/compose-demo/init:/docker-entrypoint-initdb.d:ro`,
+					},
+				],
+			},
+			{
+				id: 'named-bind-external',
+				eyebrow: 'What QuadletGen writes',
+				heading: 'Named volumes, bind mounts, and external: true',
+				paragraphs: [
+					'pgdata is declared under the top-level volumes: block and mounted as pgdata:/var/lib/postgresql/data. That is a compose volume to Quadlet pair: one .volume unit plus a Volume= line that names the unit file. VolumeName= uses the Compose key pgdata. A name: field under that volume, if you add one, is not read.',
+					'external-archive is declared with external: true and mounted by the nginx service as external-archive:/usr/share/nginx/archive:ro. QuadletGen does not write external-archive.volume. The container line stays Volume=external-archive:/usr/share/nginx/archive:ro, which expects a Podman volume that already exists. Bind sources that contain a slash stay host paths.',
+				],
+				codes: [
+					{
+						title: 'pgdata.volume from the loaded sample',
+						code: `[Unit]
+Description=pgdata Podman volume
+
+[Volume]
+VolumeName=pgdata`,
+					},
+					{
+						title: 'Volume= lines with SELinux mode none',
+						code: `# db.container
+Volume=pgdata.volume:/var/lib/postgresql/data
+Volume=/srv/compose-demo/config:/etc/postgres/conf.d:ro
+Volume=/srv/compose-demo/private:/var/lib/private:Z
+Volume=/srv/compose-demo/init:/docker-entrypoint-initdb.d:ro
+
+# web.container
+Volume=external-archive:/usr/share/nginx/archive:ro`,
+					},
+				],
+				links: [
+					{
+						href: '/docker-compose-to-podman-quadlet-migration-guide/',
+						label: 'Move an existing Docker named volume when you migrate',
+					},
+					{
+						href: '/rootless-quadlet-selinux-volume-generator/',
+						label: 'Rootless SELinux :z and :Z volume generator',
+					},
+				],
+			},
+			{
+				id: 'selinux-suffix',
+				eyebrow: 'SELinux dropdown',
+				heading: ':z and :Z versus the SELinux select',
+				paragraphs: [
+					'The workbench SELinux control is separate from suffixes already written in Compose. Mode none leaves the sample as shown above. shared-z appends z, and private-Z appends Z, only on mounts whose option list does not already include z or Z. The private :Z on /srv/compose-demo/private stays :Z even when the select is shared-z. The read-only config mount becomes :ro,z under shared-z and :ro,Z under private-Z.',
+					'Named volume units do not get a special SELinux key inside the .volume file. The suffix, when the select adds one, is on the container Volume= line, including pgdata.volume:/var/lib/postgresql/data:z. QuadletGen does not resolve relative bind paths and does not create host directories. Dry-run with /usr/libexec/podman/quadlet --dryrun --user after you copy the files into place.',
+				],
+				bullets: [
+					'Short :z or :Z is kept and is not doubled.',
+					'Long-form bind.selinux is not a substitute for that suffix.',
+					'external: true still does not create a .volume unit after you change the select. The select only adds a suffix, so the sample archive mount becomes Volume=external-archive:/usr/share/nginx/archive:ro,z or :ro,Z.',
+				],
+			},
+		],
+		spotlightLinks: [
+			{
+				href: '/rootless-quadlet-selinux-volume-generator/',
+				eyebrow: 'SELinux',
+				title: 'Rootless Quadlet SELinux volume labels',
+				summary:
+					'When to add shared :z or private :Z, and which host directories you should not relabel.',
+			},
+			{
+				href: '/docker-compose-to-podman-quadlet-migration-guide/',
+				eyebrow: 'Migration',
+				title: 'Docker Compose to Podman Quadlet migration',
+				summary:
+					'Export a Docker named volume and import it under the VolumeName= this page generates.',
+			},
 		],
 	},
 ];
