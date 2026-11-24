@@ -161,24 +161,14 @@ export function dependencySkips(warnings: ConversionWarning[]): ConversionWarnin
 	return warnings.filter((warning) => warning.impact === 'skipped' || warning.impact === 'degraded');
 }
 
-export function formatDependencySkipReport(
-	stackName: string,
-	warnings: ConversionWarning[],
-): string | null {
-	const skips = dependencySkips(warnings);
-	if (skips.length === 0) {
-		return null;
-	}
-	const lines = [
-		`QuadletGen export: ${stackName}`,
-		'',
-		'Skipped or degraded depends_on semantics',
-		'',
-		'After= and Requires= (or Wants= when required: false) in the generated units order startup only.',
-		'They do not wait for a healthcheck, and they do not wait for a container to exit successfully.',
-		'',
-	];
-	for (const warning of skips) {
+const ENV_FILE_NOT_BUNDLED_CODE = 'env-file-not-bundled';
+
+function isDependencyWarning(warning: ConversionWarning): boolean {
+	return warning.field.startsWith('depends_on') || (warning.code?.startsWith('depends_on.') ?? false);
+}
+
+function appendWarningList(lines: string[], warnings: ConversionWarning[]): void {
+	for (const warning of warnings) {
 		lines.push(
 			`[${warning.service ?? 'stack'}] ${warning.field} (${warning.code ?? 'unspecified'})`,
 		);
@@ -186,6 +176,56 @@ export function formatDependencySkipReport(
 		lines.push(`  ${warning.message}`);
 		lines.push('');
 	}
+}
+
+export function formatDependencySkipReport(
+	stackName: string,
+	warnings: ConversionWarning[],
+): string | null {
+	const skips = dependencySkips(warnings);
+	const dependencyWarnings = skips.filter(isDependencyWarning);
+	const envFileWarnings = skips.filter((warning) => warning.code === ENV_FILE_NOT_BUNDLED_CODE);
+	const otherWarnings = skips.filter(
+		(warning) => !dependencyWarnings.includes(warning) && !envFileWarnings.includes(warning),
+	);
+	if (skips.length === 0) {
+		return null;
+	}
+
+	const lines = [`QuadletGen export: ${stackName}`, ''];
+
+	if (dependencyWarnings.length > 0) {
+		lines.push(
+			'Skipped or degraded depends_on semantics',
+			'',
+			'After= and Requires= (or Wants= when required: false) in the generated units order startup only.',
+			'They do not wait for a healthcheck, and they do not wait for a container to exit successfully.',
+			'',
+		);
+		appendWarningList(lines, dependencyWarnings);
+	}
+
+	if (envFileWarnings.length > 0) {
+		lines.push(
+			'Env files you must create on the target host',
+			'',
+			'These env_file entries are referenced by EnvironmentFile= but were not bundled with this export.',
+			'Create each file next to the unit files, or at the absolute path shown, before starting the services.',
+			'',
+		);
+		for (const warning of envFileWarnings) {
+			const envFilePath = warning.field.replace(/^env_file\./, '');
+			lines.push(`- ${envFilePath}`);
+			lines.push(`  ${warning.message}`);
+			lines.push('');
+		}
+	}
+
+	if (otherWarnings.length > 0) {
+		lines.push('Other degraded items', '');
+		appendWarningList(lines, otherWarnings);
+	}
+
 	return `${lines.join('\n')}\n`;
 }
 

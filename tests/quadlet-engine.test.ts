@@ -243,6 +243,9 @@ services:
       - /srv/ro:/config:ro
       - /srv/already-shared:/shared:z
       - /srv/already-private:/private:ro,Z
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /usr/share/zoneinfo:/usr/share/zoneinfo:ro
       - named-vol:/var/lib/named
 volumes:
   named-vol:
@@ -259,6 +262,11 @@ volumes:
 		expect(sharedContent).toContain('Volume=/srv/ro:/config:ro,z');
 		expect(sharedContent).toContain('Volume=/srv/already-shared:/shared:z');
 		expect(sharedContent).toContain('Volume=/srv/already-private:/private:ro,Z');
+		expect(sharedContent).toContain('Volume=/etc/localtime:/etc/localtime:ro');
+		expect(sharedContent).toContain('Volume=/etc/timezone:/etc/timezone:ro');
+		expect(sharedContent).toContain('Volume=/usr/share/zoneinfo:/usr/share/zoneinfo:ro');
+		expect(sharedContent).not.toContain('/etc/localtime:/etc/localtime:ro,z');
+		expect(sharedContent).not.toContain('/usr/share/zoneinfo:/usr/share/zoneinfo:ro,z');
 		expect(sharedContent).toContain('Volume=named-vol.volume:/var/lib/named:z');
 
 		const privateRes = convertToQuadlet(yaml, {
@@ -273,6 +281,8 @@ volumes:
 		expect(privateContent).toContain('Volume=/srv/ro:/config:ro,Z');
 		expect(privateContent).toContain('Volume=/srv/already-shared:/shared:z');
 		expect(privateContent).toContain('Volume=/srv/already-private:/private:ro,Z');
+		expect(privateContent).toContain('Volume=/etc/localtime:/etc/localtime:ro');
+		expect(privateContent).not.toContain('/etc/localtime:/etc/localtime:ro,Z');
 		expect(privateContent).toContain('Volume=named-vol.volume:/var/lib/named:Z');
 	});
 
@@ -338,6 +348,166 @@ services:
 				cmd.includes('sudo systemctl daemon-reload && sudo systemctl start auth.service'),
 			),
 		).toBe(true);
+	});
+
+	it('warns without fabricating content when env_file is not bundled', () => {
+		const yaml = `
+services:
+  app:
+    image: nextcloud:30-apache
+    env_file:
+      - db.env
+`;
+		const res = convertToQuadlet(yaml, { ...DEFAULT_OPTIONS, stackName: 'cloud' });
+		expect(res.ok).toBe(true);
+		if (!res.ok) return;
+
+		expect(res.files.some((f) => f.filename === 'db.env')).toBe(false);
+		const app = res.files.find((f) => f.filename === 'app.container')!;
+		expect(app.content).toContain('EnvironmentFile=db.env');
+
+		const warning = res.warnings.find((w) => w.code === 'env-file-not-bundled');
+		expect(warning).toBeDefined();
+		expect(warning?.impact).toBe('degraded');
+		expect(warning?.message).toContain('db.env');
+		expect(warning?.message).toContain('app');
+	});
+
+	it('bundles env_file content through a resolver and points EnvironmentFile at the copied file', () => {
+		const yaml = `
+services:
+  app:
+    image: nextcloud:30-apache
+    env_file:
+      - config/db.env
+`;
+		const res = convertToQuadlet(yaml, { ...DEFAULT_OPTIONS, stackName: 'cloud' }, (envPath) =>
+			envPath === 'config/db.env' ? 'DB_PASSWORD=from-disk\n' : null,
+		);
+		expect(res.ok).toBe(true);
+		if (!res.ok) return;
+
+		const bundled = res.files.find((f) => f.filename === 'db.env')!;
+		expect(bundled).toBeDefined();
+		expect(bundled.unitType).toBe('env');
+		expect(bundled.content).toBe('DB_PASSWORD=from-disk\n');
+
+		const app = res.files.find((f) => f.filename === 'app.container')!;
+		expect(app.content).toContain('EnvironmentFile=db.env');
+		expect(res.warnings.some((w) => w.code === 'env-file-not-bundled')).toBe(false);
+	});
+
+	it('renames the extracted secrets file when env_file already uses <stack>.env', () => {
+		const yaml = `
+services:
+  app:
+    image: demo:1
+    env_file: [demo.env]
+    environment:
+      API_TOKEN: change-me
+      APP_MODE: production
+`;
+		const res = convertToQuadlet(
+			yaml,
+			{ ...DEFAULT_OPTIONS, stackName: 'demo', extractSecretsToEnvFile: true },
+			(envPath) =>
+				envPath === 'demo.env' ? 'APP_MODE=production\nPUBLIC_URL=https://demo.example.com\n' : null,
+		);
+		expect(res.ok).toBe(true);
+		if (!res.ok) return;
+
+		const originalEnv = res.files.find((f) => f.unitType === 'env' && f.filename === 'demo.env')!;
+		expect(originalEnv).toBeDefined();
+		expect(originalEnv.content).toContain('APP_MODE=production');
+		expect(originalEnv.content).not.toContain('API_TOKEN');
+
+		const secrets = res.files.find((f) => f.filename === 'demo.secrets.env')!;
+		expect(secrets).toBeDefined();
+		expect(secrets.content).toBe('API_TOKEN=change-me\n');
+
+		const warning = res.warnings.find((w) => w.code === 'secrets-env-file-renamed');
+		expect(warning).toBeDefined();
+		expect(warning?.impact).toBe('degraded');
+		expect(warning?.message).toContain('demo.secrets.env');
+
+		const app = res.files.find((f) => f.filename === 'app.container')!;
+		expect(app.content).toContain('EnvironmentFile=demo.env');
+		expect(app.content).toContain(
+			'EnvironmentFile=%h/.config/containers/systemd/demo.secrets.env',
+		);
+
+		const browserRes = convertToQuadlet(yaml, {
+			...DEFAULT_OPTIONS,
+			stackName: 'demo',
+			extractSecretsToEnvFile: true,
+		});
+		expect(browserRes.ok).toBe(true);
+		if (!browserRes.ok) return;
+		expect(browserRes.files.some((f) => f.filename === 'demo.env')).toBe(false);
+		expect(browserRes.files.some((f) => f.filename === 'demo.secrets.env')).toBe(true);
+		expect(browserRes.warnings.some((w) => w.code === 'secrets-env-file-renamed')).toBe(true);
+	});
+
+	it('warns for every generated unit line that still contains an unresolved Compose variable', () => {
+		const yaml = `
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: \${DB_PASSWORD}
+      POSTGRES_DB: \${DB_NAME:-immich}
+    volumes:
+      - \${DB_DATA_LOCATION}:/var/lib/postgresql/data
+`;
+		const res = convertToQuadlet(yaml, { ...DEFAULT_OPTIONS, stackName: 'interp' });
+		expect(res.ok).toBe(true);
+		if (!res.ok) return;
+
+		const unresolved = res.warnings.filter((w) => w.code === 'unresolved-variable');
+		expect(unresolved.length).toBeGreaterThanOrEqual(3);
+		for (const warning of unresolved) {
+			expect(warning.impact).toBe('degraded');
+			expect(warning.service).toBe('db');
+			expect(warning.message).toContain('.env');
+		}
+
+		const db = res.files.find((f) => f.filename === 'db.container')!;
+		expect(db.content).toContain('Environment=POSTGRES_PASSWORD=${DB_PASSWORD}');
+		expect(db.content).toContain('Volume=${DB_DATA_LOCATION}:/var/lib/postgresql/data');
+	});
+
+	it('warns for unresolved Compose variables that move into the extracted secrets env file', () => {
+		const yaml = `
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: \${DB_PASSWORD}
+      POSTGRES_DB: immich
+`;
+		const res = convertToQuadlet(yaml, {
+			...DEFAULT_OPTIONS,
+			stackName: 'secrets',
+			extractSecretsToEnvFile: true,
+		});
+		expect(res.ok).toBe(true);
+		if (!res.ok) return;
+
+		const secrets = res.files.find((f) => f.filename === 'secrets.env')!;
+		expect(secrets).toBeDefined();
+		expect(secrets.content).toBe('POSTGRES_PASSWORD=${DB_PASSWORD}\n');
+
+		const unresolved = res.warnings.filter((w) => w.code === 'unresolved-variable');
+		expect(unresolved).toHaveLength(1);
+		expect(unresolved[0].service).toBe('db');
+		expect(unresolved[0].field).toBe('POSTGRES_PASSWORD');
+		expect(unresolved[0].impact).toBe('degraded');
+		expect(unresolved[0].message).toContain('secrets.env');
+		expect(unresolved[0].message).toContain('${DB_PASSWORD}');
+
+		const db = res.files.find((f) => f.filename === 'db.container')!;
+		expect(db.content).toContain('EnvironmentFile=%h/.config/containers/systemd/secrets.env');
+		expect(db.content).not.toContain('POSTGRES_PASSWORD');
 	});
 
 	it('qualifies bare and namespace short image names while preserving explicit registries', () => {

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
-import { convertToQuadlet } from './lib/quadlet-engine';
+import { convertToQuadlet, type EnvFileResolver } from './lib/quadlet-engine';
 import type {
 	InstallScope,
 	QuadletConvertOptions,
@@ -251,6 +251,23 @@ export async function runCli(argv: string[]): Promise<number> {
 
 	const stackName = args.stackName || inferredStack;
 
+	const envFileBaseDir = args.inputPath
+		? path.dirname(path.resolve(process.cwd(), args.inputPath))
+		: process.cwd();
+	const resolveEnvFile: EnvFileResolver = (envFilePath) => {
+		const candidate = path.isAbsolute(envFilePath)
+			? envFilePath
+			: path.resolve(envFileBaseDir, envFilePath);
+		try {
+			if (!existsSync(candidate)) {
+				return null;
+			}
+			return readFileSync(candidate, 'utf8');
+		} catch {
+			return null;
+		}
+	};
+
 	const convertOptions: QuadletConvertOptions = {
 		stackName,
 		installScope: args.installScope,
@@ -260,7 +277,7 @@ export async function runCli(argv: string[]): Promise<number> {
 		extractSecretsToEnvFile: args.extractSecretsToEnvFile,
 	};
 
-	const result = convertToQuadlet(rawInput, convertOptions);
+	const result = convertToQuadlet(rawInput, convertOptions, resolveEnvFile);
 
 	if (!result.ok) {
 		console.error(`Conversion failed: ${result.error}`);

@@ -425,10 +425,10 @@ const initialDetectedMode = initialResult.ok ? initialResult.inputMode : preset.
 				initialSkips.length === 0 ? 'hidden' : ''
 			}`}
 		>
-			<p class="font-semibold">Depends_on conditions without a full mapping</p>
+			<p class="font-semibold">Skipped or degraded conversion items</p>
 			<p class="mt-1 text-amber-200">
-				After= and Requires= order startup only. Skipped or degraded entries keep no health or completion
-				guarantee. The same list is written to README.txt inside the downloaded ZIP.
+				After= and Requires= order startup only. Skipped or degraded entries need a manual follow-up step
+				before startup. The same list is written to README.txt inside the downloaded ZIP.
 			</p>
 			<ul data-testid="dependency-skip-list" class="mt-2 space-y-1.5">
 				{

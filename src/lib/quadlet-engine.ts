@@ -214,9 +214,12 @@ const SHORT_VALUE_FLAG_MAP: Record<string, string> = {
 	w: '-w',
 };
 
+export type EnvFileResolver = (envFilePath: string) => string | null;
+
 export function convertToQuadlet(
 	rawInput: string,
 	options: QuadletConvertOptions,
+	resolveEnvFile?: EnvFileResolver,
 ): QuadletConversionResult {
 	const trimmed = rawInput.trim();
 	if (!trimmed) {
@@ -245,7 +248,7 @@ export function convertToQuadlet(
 		};
 	}
 
-	return emitQuadletUnits(parsed.value, inputMode, normalizedOptions);
+	return emitQuadletUnits(parsed.value, inputMode, normalizedOptions, resolveEnvFile);
 }
 
 function detectInputMode(trimmedInput: string): InputMode {
@@ -1375,14 +1378,11 @@ function emitQuadletUnits(
 	stack: NormalizedStack,
 	inputMode: InputMode,
 	options: QuadletConvertOptions,
+	resolveEnvFile?: EnvFileResolver,
 ): QuadletConversionResult {
 	const { stackName, installScope, selinuxMode, enableAutoUpdate } = options;
 	const baseInstallDir =
 		installScope === 'rootless' ? '~/.config/containers/systemd' : '/etc/containers/systemd';
-	const systemdEnvFileRef =
-		installScope === 'rootless'
-			? `%h/.config/containers/systemd/${stackName}.env`
-			: `/etc/containers/systemd/${stackName}.env`;
 
 	const useSharedNetwork =
 		options.generateSharedNetwork && (stack.services.length >= 2 || stack.hasExplicitNetworks);
@@ -1396,7 +1396,112 @@ function emitQuadletUnits(
 	const warnings = [...stack.warnings];
 	const notifyHealthy = servicesNeedingHealthyNotify(stack, warnings);
 
+	const envFileRefMap = new Map<string, string>();
+	const bundledEnvFiles: GeneratedUnitFile[] = [];
+	const usedEnvFilenames = new Map<string, string>();
+	const envFileUsers = new Map<string, string[]>();
+	for (const svc of stack.services) {
+		for (const envFilePath of svc.envFiles) {
+			const users = envFileUsers.get(envFilePath) ?? [];
+			users.push(svc.name);
+			envFileUsers.set(envFilePath, users);
+		}
+	}
+
+	for (const [envFilePath, users] of envFileUsers.entries()) {
+		const userLabel = users.length === 1 ? users[0] : undefined;
+		const resolvedContent = resolveEnvFile?.(envFilePath) ?? null;
+
+		if (envFilePath.startsWith('/')) {
+			envFileRefMap.set(envFilePath, envFilePath);
+			if (resolvedContent === null) {
+				warnings.push({
+					service: userLabel,
+					field: `env_file.${envFilePath}`,
+					code: 'env-file-not-bundled',
+					impact: 'degraded',
+					message: `env_file ${envFilePath} (used by ${users.join(', ')}) is an absolute path and was not bundled with the units. The absolute path is kept in EnvironmentFile=, so the file must exist on the target host before startup.`,
+				});
+			}
+			continue;
+		}
+
+		if (resolvedContent === null) {
+			envFileRefMap.set(envFilePath, envFilePath);
+			warnings.push({
+				service: userLabel,
+				field: `env_file.${envFilePath}`,
+				code: 'env-file-not-bundled',
+				impact: 'degraded',
+				message: `env_file ${envFilePath} (used by ${users.join(', ')}) is referenced but its contents were not bundled with the units. Create ${envFilePath} next to the unit files with the same contents, or EnvironmentFile= will fail to load.`,
+			});
+			continue;
+		}
+
+		const content = resolvedContent;
+		const baseFilename = envFileBasename(envFilePath);
+		let filename = baseFilename;
+		let counter = 2;
+		while (usedEnvFilenames.has(filename) && usedEnvFilenames.get(filename) !== envFilePath) {
+			filename = addFilenameSuffix(baseFilename, counter);
+			counter += 1;
+		}
+		if (filename !== baseFilename) {
+			warnings.push({
+				service: userLabel,
+				field: `env_file.${envFilePath}`,
+				code: 'env-file-name-conflict',
+				impact: 'degraded',
+				message: `Another env_file entry already uses the name ${baseFilename}. ${envFilePath} was bundled as ${filename}, and its EnvironmentFile= reference was updated to match.`,
+			});
+		}
+		usedEnvFilenames.set(filename, envFilePath);
+		envFileRefMap.set(envFilePath, filename);
+		bundledEnvFiles.push({
+			filename,
+			unitType: 'env',
+			installPath: `${baseInstallDir}/${filename}`,
+			content,
+		});
+	}
+
+	const hasExtractableSecrets =
+		options.extractSecretsToEnvFile &&
+		stack.services.some((svc) => svc.environment.some((entry) => SECRET_KEY_PATTERN.test(entry.key)));
+
+	const reservedEnvFilenames = new Set<string>(usedEnvFilenames.keys());
+	for (const envFilePath of envFileUsers.keys()) {
+		reservedEnvFilenames.add(envFileBasename(envFilePath));
+	}
+
+	let secretEnvFilename: string | undefined;
+	if (hasExtractableSecrets) {
+		secretEnvFilename = `${stackName}.env`;
+		if (reservedEnvFilenames.has(secretEnvFilename)) {
+			let candidate = `${stackName}.secrets.env`;
+			let counter = 2;
+			while (reservedEnvFilenames.has(candidate)) {
+				candidate = `${stackName}-${counter}.secrets.env`;
+				counter += 1;
+			}
+			warnings.push({
+				field: 'environment',
+				code: 'secrets-env-file-renamed',
+				impact: 'degraded',
+				message: `${stackName}.env is already referenced by env_file in this stack. Extracted secrets were written to ${candidate} instead so your existing env file is not overwritten.`,
+			});
+			secretEnvFilename = candidate;
+		}
+	}
+
+	const systemdEnvFileRef = secretEnvFilename
+		? installScope === 'rootless'
+			? `%h/.config/containers/systemd/${secretEnvFilename}`
+			: `/etc/containers/systemd/${secretEnvFilename}`
+		: undefined;
+
 	const containerFiles: GeneratedUnitFile[] = [];
+	const secretVariableWarnings = new Set<string>();
 
 	for (const svc of stack.services) {
 		const inlineEnv: EnvEntry[] = [];
@@ -1410,10 +1515,17 @@ function emitQuadletUnits(
 					warnings.push({
 						service: svc.name,
 						field: `environment.${entry.key}`,
-						message: `Secret key ${entry.key} has conflicting values across services. Verify ${stackName}.env before starting units.`,
+						message: `Secret key ${entry.key} has conflicting values across services. Verify ${secretEnvFilename} before starting units.`,
 					});
 				} else {
 					extractedSecrets.set(entry.key, entry.value);
+					collectUnresolvedSecretValueWarning(
+						svc.name,
+						entry,
+						secretEnvFilename ?? `${stackName}.env`,
+						warnings,
+						secretVariableWarnings,
+					);
 				}
 			} else {
 				inlineEnv.push(entry);
@@ -1427,10 +1539,13 @@ function emitQuadletUnits(
 			enableAutoUpdate,
 			useSharedNetwork,
 			volumeUnitMap,
+			envFileRefMap,
 			inlineEnv,
 			secretEnvFileRef: serviceUsesSecretEnvFile ? systemdEnvFileRef : undefined,
 			notifyHealthy: notifyHealthy.has(svc.name),
 		});
+
+		collectUnresolvedVariableWarnings(svc.name, content, warnings);
 
 		const filename = `${svc.unitName}.container`;
 		containerFiles.push({
@@ -1464,25 +1579,30 @@ function emitQuadletUnits(
 	}
 
 	const envFiles: GeneratedUnitFile[] = [];
-	if (extractedSecrets.size > 0) {
-		const filename = `${stackName}.env`;
+	if (extractedSecrets.size > 0 && secretEnvFilename) {
 		const envLines: string[] = [];
 		for (const [key, value] of extractedSecrets.entries()) {
 			envLines.push(formatEnvFileAssignment(key, value));
 		}
 		envFiles.push({
-			filename,
+			filename: secretEnvFilename,
 			unitType: 'env',
-			installPath: `${baseInstallDir}/${filename}`,
+			installPath: `${baseInstallDir}/${secretEnvFilename}`,
 			content: `${envLines.join('\n')}\n`,
 		});
 	}
 
-	const files = [...containerFiles, ...networkFiles, ...volumeFiles, ...envFiles];
+	const files = [
+		...containerFiles,
+		...networkFiles,
+		...volumeFiles,
+		...bundledEnvFiles,
+		...envFiles,
+	];
 	const systemdCommands = buildSystemdCommands(
 		stack.services.map((s) => `${s.unitName}.service`),
 		installScope,
-		extractedSecrets.size > 0 ? `${stackName}.env` : undefined,
+		secretEnvFilename,
 	);
 
 	return {
@@ -1502,6 +1622,7 @@ interface RenderContainerContext {
 	enableAutoUpdate: boolean;
 	useSharedNetwork: boolean;
 	volumeUnitMap: Map<string, string>;
+	envFileRefMap: Map<string, string>;
 	inlineEnv: EnvEntry[];
 	secretEnvFileRef?: string;
 	notifyHealthy: boolean;
@@ -1585,8 +1706,14 @@ function renderContainerUnit(svc: NormalizedService, ctx: RenderContainerContext
 		containerLines.push(`Tmpfs=${tmpfsPath}`);
 	}
 
+	const emittedEnvFiles = new Set<string>();
 	for (const envFile of svc.envFiles) {
-		containerLines.push(`EnvironmentFile=${envFile}`);
+		const resolvedEnvFile = ctx.envFileRefMap.get(envFile) ?? envFile;
+		if (emittedEnvFiles.has(resolvedEnvFile)) {
+			continue;
+		}
+		emittedEnvFiles.add(resolvedEnvFile);
+		containerLines.push(`EnvironmentFile=${resolvedEnvFile}`);
 	}
 
 	if (ctx.secretEnvFileRef) {
@@ -1662,6 +1789,90 @@ function renderContainerUnit(svc: NormalizedService, ctx: RenderContainerContext
 	].join('\n\n')}\n`;
 }
 
+const SYSTEM_HOST_PATH_PREFIXES = ['/etc', '/usr', '/proc', '/sys', '/dev'];
+const COMPOSE_VARIABLE_PATTERN = /\$\{[^}]+\}/g;
+
+function isSystemHostPath(source: string | undefined): boolean {
+	if (!source || !source.startsWith('/')) {
+		return false;
+	}
+	return SYSTEM_HOST_PATH_PREFIXES.some(
+		(prefix) => source === prefix || source.startsWith(`${prefix}/`),
+	);
+}
+
+function envFileBasename(rawPath: string): string {
+	const normalized = rawPath.replace(/\\/g, '/');
+	const segments = normalized.split('/').filter((segment) => segment.length > 0);
+	const base = segments[segments.length - 1] ?? 'env-file.env';
+	const cleaned = base.replace(/[^a-zA-Z0-9_.-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '');
+	return cleaned || 'env-file.env';
+}
+
+function addFilenameSuffix(filename: string, counter: number): string {
+	const dotIndex = filename.lastIndexOf('.');
+	if (dotIndex <= 0) {
+		return `${filename}-${counter}`;
+	}
+	return `${filename.slice(0, dotIndex)}-${counter}${filename.slice(dotIndex)}`;
+}
+
+function collectUnresolvedSecretValueWarning(
+	serviceName: string,
+	entry: EnvEntry,
+	envFilename: string,
+	warnings: ConversionWarning[],
+	seen: Set<string>,
+): void {
+	const matches = entry.value.match(COMPOSE_VARIABLE_PATTERN);
+	if (!matches) {
+		return;
+	}
+	const variables = matches.join(', ');
+	const dedupeKey = `${entry.key}:${variables}`;
+	if (seen.has(dedupeKey)) {
+		return;
+	}
+	seen.add(dedupeKey);
+	warnings.push({
+		service: serviceName,
+		field: entry.key,
+		code: 'unresolved-variable',
+		impact: 'degraded',
+		message: `${entry.key}= in ${envFilename} still contains ${variables}. Compose would interpolate this from the shell or a .env file, but the converter does not guess values. Replace the value by hand before starting units, or supply ${variables} wherever you run Compose.`,
+	});
+}
+
+function collectUnresolvedVariableWarnings(
+	serviceName: string,
+	content: string,
+	warnings: ConversionWarning[],
+): void {
+	const seen = new Set<string>();
+	for (const line of content.split('\n')) {
+		const matches = line.match(COMPOSE_VARIABLE_PATTERN);
+		if (!matches) {
+			continue;
+		}
+		const trimmed = line.trim();
+		const assignmentIndex = trimmed.indexOf('=');
+		const key = assignmentIndex > 0 ? trimmed.slice(0, assignmentIndex).trim() : 'value';
+		const dedupeKey = `${key}:${trimmed}`;
+		if (seen.has(dedupeKey)) {
+			continue;
+		}
+		seen.add(dedupeKey);
+		const variables = matches.join(', ');
+		warnings.push({
+			service: serviceName,
+			field: key,
+			code: 'unresolved-variable',
+			impact: 'degraded',
+			message: `${key}= still contains ${variables}. Compose would interpolate this from the shell or a .env file, but the converter does not guess values. Provide ${variables} in a .env file on the target host, or replace the value by hand before starting.`,
+		});
+	}
+}
+
 function formatQuadletVolume(
 	mount: VolumeMount,
 	selinuxMode: SelinuxMode,
@@ -1675,7 +1886,12 @@ function formatQuadletVolume(
 	const resolvedSource = mappedUnit ? `${mappedUnit}.volume` : mount.source;
 	const opts = [...mount.options];
 
-	if (selinuxMode !== 'none' && !opts.includes('z') && !opts.includes('Z')) {
+	if (
+		selinuxMode !== 'none' &&
+		!isSystemHostPath(mount.source) &&
+		!opts.includes('z') &&
+		!opts.includes('Z')
+	) {
 		opts.push(selinuxMode === 'shared-z' ? 'z' : 'Z');
 	}
 

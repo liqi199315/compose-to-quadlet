@@ -170,6 +170,88 @@ describe('Standalone CLI (bin/compose-to-quadlet.mjs)', () => {
 		expect(zipText).toContain('service_completed_successfully');
 	});
 
+	it('copies a referenced env_file into --out-dir when it exists next to the input', () => {
+		const composePath = path.join(tempDir, 'cloud.yaml');
+		const composeYaml = `services:
+  app:
+    image: nextcloud:30-apache
+    env_file:
+      - db.env
+`;
+		writeFileSync(composePath, composeYaml, 'utf8');
+		writeFileSync(path.join(tempDir, 'db.env'), 'DB_PASSWORD=from-disk\n', 'utf8');
+
+		const outDir = path.join(tempDir, 'units');
+		const res = runCli(['--input', composePath, '--stack', 'cloud', '--out-dir', outDir]);
+
+		expect(res.status).toBe(0);
+		expect(res.stderr).not.toContain('not bundled');
+		expect(readFileSync(path.join(outDir, 'db.env'), 'utf8')).toBe('DB_PASSWORD=from-disk\n');
+		expect(readFileSync(path.join(outDir, 'app.container'), 'utf8')).toContain(
+			'EnvironmentFile=db.env',
+		);
+	});
+
+	it('warns and lists a missing env_file in the ZIP README instead of inventing content', () => {
+		const composePath = path.join(tempDir, 'missing-env.yaml');
+		const composeYaml = `services:
+  app:
+    image: nextcloud:30-apache
+    env_file:
+      - missing.env
+`;
+		writeFileSync(composePath, composeYaml, 'utf8');
+
+		const outDir = path.join(tempDir, 'units');
+		const res = runCli(['--input', composePath, '--stack', 'cloud', '--out-dir', outDir]);
+		expect(res.status).toBe(0);
+		expect(res.stderr).toContain('missing.env');
+		expect(res.stderr).toContain('not bundled');
+		expect(existsSync(path.join(outDir, 'missing.env'))).toBe(false);
+
+		const zipPath = path.join(tempDir, 'cloud.zip');
+		const zipRes = runCli(['--input', composePath, '--stack', 'cloud', '--zip', zipPath]);
+		expect(zipRes.status).toBe(0);
+		const zipText = readFileSync(zipPath, 'utf8');
+		expect(zipText).toContain('Env files you must create on the target host');
+		expect(zipText).toContain('- missing.env');
+	});
+
+	it('never overwrites an existing <stack>.env during --extract-secrets', () => {
+		const composePath = path.join(tempDir, 'demo.yaml');
+		const composeYaml = `services:
+  app:
+    image: demo:1
+    env_file:
+      - demo.env
+    environment:
+      API_TOKEN: change-me
+      APP_MODE: production
+`;
+		writeFileSync(composePath, composeYaml, 'utf8');
+		const envPath = path.join(tempDir, 'demo.env');
+		const originalEnv = 'APP_MODE=production\nPUBLIC_URL=https://demo.example.com\n';
+		writeFileSync(envPath, originalEnv, 'utf8');
+
+		const res = runCli([
+			'--input',
+			composePath,
+			'--stack',
+			'demo',
+			'--extract-secrets',
+			'--out-dir',
+			tempDir,
+		]);
+
+		expect(res.status).toBe(0);
+		expect(readFileSync(envPath, 'utf8')).toBe(originalEnv);
+		expect(existsSync(path.join(tempDir, 'demo.secrets.env'))).toBe(true);
+		expect(readFileSync(path.join(tempDir, 'demo.secrets.env'), 'utf8')).toContain(
+			'API_TOKEN=change-me',
+		);
+		expect(res.stderr).toContain('demo.secrets.env');
+	});
+
 	it('fails gracefully on missing input file', () => {
 		const res = runCli(['--input', path.join(tempDir, 'nonexistent.yml')]);
 		expect(res.status).toBe(1);

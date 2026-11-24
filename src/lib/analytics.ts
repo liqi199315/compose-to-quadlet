@@ -1,3 +1,5 @@
+import { isInternalTraffic } from './internal-traffic';
+
 export type AnalyticsParamValue = string | number | boolean;
 export type AnalyticsParams = Record<string, AnalyticsParamValue>;
 
@@ -77,12 +79,19 @@ export function trackToolEvent(
 		return;
 	}
 
-	if (params === undefined) {
+	const internalTraffic = isInternalTraffic();
+	const cleanParams: Record<string, AnalyticsParamValue> =
+		params === undefined ? {} : sanitizeParams(params);
+	if (internalTraffic) {
+		cleanParams.traffic_type = 'internal';
+	}
+
+	if (params === undefined && !internalTraffic) {
 		window.gtag('event', trimmedEvent);
 		return;
 	}
 
-	window.gtag('event', trimmedEvent, sanitizeParams(params));
+	window.gtag('event', trimmedEvent, cleanParams);
 }
 
 let quadletConvertedTracked = false;

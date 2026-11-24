@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import { INTERNAL_TRAFFIC_BOOTSTRAP } from '../lib/internal-traffic';
 import { ROUTE_PRESETS } from '../lib/route-presets';
 import type { RouteFaqItem } from '../lib/types';
 
@@ -32,9 +33,7 @@ const ogImageAlt =
 
 const rawGa4Id = (import.meta.env.PUBLIC_GA4_MEASUREMENT_ID ?? '').trim();
 const ga4MeasurementId =
-	/^G-[A-Z0-9]{4,20}$/i.test(rawGa4Id) && rawGa4Id.toUpperCase() !== 'G-XXXXXXXXXX'
-		? rawGa4Id
-		: 'G-PENDING000';
+	/^G-[A-Z0-9]{4,20}$/i.test(rawGa4Id) && /\d/.test(rawGa4Id) ? rawGa4Id : '';
 
 const rawClarityId = (import.meta.env.PUBLIC_CLARITY_PROJECT_ID ?? '').trim();
 const clarityProjectId = /^[a-z0-9]{6,24}$/i.test(rawClarityId) ? rawClarityId : '';
@@ -139,7 +138,8 @@ const structuredData = {
 const ga4InlineBootstrap = `(function(){
 if(window.__quadletGenAnalyticsBootstrap)return;
 window.__quadletGenAnalyticsBootstrap=true;
-var ga4Id=${JSON.stringify(ga4MeasurementId || 'G-PENDING000')};
+${INTERNAL_TRAFFIC_BOOTSTRAP}
+var ga4Id=${JSON.stringify(ga4MeasurementId)};
 var clarityId=${JSON.stringify(clarityProjectId)};
 window.dataLayer=window.dataLayer||[];
 function queueGtag(){window.dataLayer.push(arguments);}
@@ -184,8 +184,10 @@ return queueGtag.apply(null,arguments);
 window.gtag=gtag;
 gtag('js',new Date());
 var safePage={page_location:analyticsPageLocation(),page_referrer:analyticsPageReferrer()};
-gtag('set',safePage);
-gtag('config',ga4Id||'G-PENDING000',Object.assign({},safePage,{anonymize_ip:true}));
+var internalTraffic=window.__qgInternalTraffic===true;
+var settings=internalTraffic?Object.assign({},safePage,{traffic_type:'internal'}):safePage;
+gtag('set',settings);
+gtag('config',ga4Id,Object.assign({},settings,{anonymize_ip:true}));
 var lastIdentity=location.pathname+location.search;
 var previousVirtualPage=location.origin+location.pathname;
 function trackNavigation(){
@@ -212,7 +214,7 @@ window.addEventListener('popstate',trackNavigation);
 }
 var host=location.hostname;
 var isLocalHost=host==='localhost'||host==='127.0.0.1'||host==='[::1]'||host.endsWith('.localhost');
-if(ga4Id&&ga4Id!=='G-PENDING000'&&ga4Id!=='G-XXXXXXXXXX'&&/^G-[A-Z0-9]+$/i.test(ga4Id)&&!isLocalHost){
+if(ga4Id&&/^G-[A-Z0-9]+$/i.test(ga4Id)&&!isLocalHost){
 var tag=document.createElement('script');
 tag.async=true;
 tag.src='https://www.googletagmanager.com/gtag/js?id='+encodeURIComponent(ga4Id);
